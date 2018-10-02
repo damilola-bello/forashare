@@ -1,0 +1,471 @@
+* {
+	padding: 0;
+	margin: 0;
+	border: 0;
+  box-sizing: border-box;
+}
+/* SASS VARIABLES */
+$page_padding: 15px;
+$max_width: 1290px;
+$demarcation_color: #d8d8d8;
+$dim: #e8e8e8;
+$link_blur: #2f7dce;//676
+
+$logo_green: #92cc9d;
+/* END OF SASS VARIABLES */
+
+/* BOOTSTRAP OVERWRITE */
+.form-control:focus, .form-control:active, .focus {
+  border-color: #fff;
+  outline: none !important;
+  box-shadow: 0 0 0 1.6px $logo_green;
+}
+.row {
+  margin: 0;
+  flex-wrap: nowrap;
+}
+.flx-col {
+  display: flex;
+  flex-flow: column;
+}
+/* END OF BOOTSTRAP OVERWRITE */
+
+
+html {
+	height: 100%;
+}
+body {
+  min-height: 100vh;
+  font-family: Lato, Arial,"Helvetica Neue",Helvetica,sans-serif;
+  display: flex;
+  flex-flow: column;
+}
+.form-lbl {
+  font-size: 0.8em;
+  font-weight: 600;
+  margin-left: -2px;
+}
+.form-group .form-control {
+  padding-left: 5px;
+  border-radius: 2px;
+}
+.search-page-blur {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  background-color: rgba(0,0,0,0.6);
+}
+a {
+  transition: 0.3s;
+}
+.p-relative {
+  position: relative;
+}
+a:hover {
+  text-decoration: none;
+}
+#logo {
+  background-image: url('../images/forashare_logo.png');
+  width: 210px;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: inline-block;
+  height: 100%;
+}
+ul {
+  list-style: none;
+}
+.toggle_ {
+	display: none;
+}
+#page_banner {
+  border-top: 2px solid $logo_green;
+  width: 100%;
+  height: 60px;
+  background-color: #f8f8f8;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.2), 0 2px 3px 0 rgba(0, 0, 0, 0.14);
+  position: sticky;
+  top: 0;
+}
+#top_bar {
+  margin: 0 auto;
+  max-width: $max_width;
+  padding: 0px $page_padding;
+  height: 100%;
+  justify-content: space-between;
+  position: relative;
+}
+#register_greeting {
+  a {
+    color: #222;
+    font-size: 0.9rem;
+    &:hover {
+      color: $link_blur;
+    }
+  }
+}
+#search_area {
+  flex-grow: 1;
+  margin: 0px 10px;
+  max-width: 800px;
+}
+#page_search_input {
+  font-size: 0.9em;
+  border-radius: 3px 0px 0px 3px;
+  border-right: 0px;
+}
+.search-forum-list {
+  cursor: pointer;
+  padding: 2px;
+  width: 55px;
+  font-size: 0.8em;
+  border-radius: 0px 3px 3px 0px;
+  border-left: 1px solid #bbb;
+  font-family: consolas, monospace;
+  background-color: #f2f2f2;
+  &:active, &:focus, &.focus {
+    background-color: #f2f2f2;
+    border-left: 0px;
+    //box-shadow: 0px 0 0 1px $logo_green;
+  }
+}
+.banner-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  cursor: pointer;
+  font-size: 1.28em;
+  height: 100%;
+  transition: 0.3s;
+  .ico {
+    color: #a0a0a0;
+    padding: 1px;
+  }
+  &:hover {
+    &:not(.options) {
+      background-color: $dim; 
+    }
+    .ico {
+      color: #000;
+    }
+  }
+  &:not(:first-of-type) {
+    margin-left: 20px;
+  }
+}
+.banner_icon_active {
+  background-color: $dim;
+  .ico {
+    color: #000;
+  }
+}
+.banner-search-image.current-forum {
+  display: inline-block;
+}
+#search_region {
+  align-items: center;
+}
+.banner-search-image {
+  padding: 0px 6px;
+  display: none;
+  max-width: 38px;
+  height: auto;
+}
+#logo_search {
+  flex-grow: 1;
+  justify-content: space-between;
+}
+#page_search_box {
+  flex-grow: 1;
+}
+#register_greeting {
+  li {
+    display: flex;
+    align-items: center;
+    &:not(:first-of-type) {
+      margin-left: 20px;
+    }
+  }
+}
+#notification_ctrls, #register_greeting {
+  padding: 0px 15px;
+}
+#notification_ctrls {
+  //border-right: 1px solid #bbb;
+}
+#searchbar_trigger {
+  display: none;
+  align-items: center;
+}
+#more_options {
+  padding-left: 15px;
+}
+.divider {
+  align-items: center;
+  color: #ccc;
+  font-size: 0.9em;
+}
+.content-container {
+  display: flex;
+  flex-flow: row;
+  margin: 0 auto;
+  max-width: $max_width;
+  padding: 0px $page_padding;
+  flex-grow: 1; //Make the content fill the remaining space of the web page
+}
+.main-content {
+  padding-top: 20px;
+  flex-grow: 1;
+}
+.reg-tab {
+  border-bottom: 1px solid $demarcation_color;
+}
+.reg-form {
+  max-width: 400px;
+  padding: 15px;
+  border: 1px solid #bbb;
+  border-radius: 2px;
+  width: 100%;
+}
+.reg-content {
+  align-items: center;
+  padding: 10px;
+  margin-top: 10px;
+}
+.reg-link {
+  margin-bottom: -1px;
+  &:not(:last-of-type) {
+    margin-right: 5px;
+  }
+  a {
+    border-radius: 3px 3px 0px 0px;
+    border: 1px solid transparent;
+    color: $link_blur;
+    &:hover:not(.reg-tab-active) {
+      color: #222;
+      background-color: #f2f2f2;
+    }
+    &.reg-tab-active {
+      color: #000;
+      cursor: default;
+      border-left-color: $demarcation_color;
+      border-right-color: $demarcation_color;
+      border-bottom-color: #fff;
+      border-top: 3px solid $logo_green;
+    }
+    padding: 10px;
+    display: inline-block;
+  }
+}
+.sidebar {
+  width: 160px;
+  min-width: 160px;
+  padding-top: 20px;
+  margin-right: 15px;
+  border-right: 1px solid #aaa;
+}
+.sidebar-navlist {
+  li {
+    transition: 0.4s;
+    cursor: pointer;
+    border-top: 1px solid transparent;
+    border-bottom: 1px solid transparent;
+    border-left: 1px solid transparent;
+    a {
+      display: inline-block;
+      width: 100%;
+      height: 100%;
+      padding: 8px;
+      color: $link_blur;
+    }
+    &:not(:last-of-type) {
+      margin-bottom: 2px;
+    }
+    &.active-nav {
+      border-right: 3px solid $logo_green;
+      border-top-color: #e5e5e5;
+      border-bottom-color: #e5e5e5;
+      background-color: #f5f5f5;
+      a {
+        color: #000;
+      }
+    }
+    &:hover:not(.active-nav) {
+      background-color: #f8f8f8;
+      border-left: 5px solid $logo_green;
+      a {
+        color: #222;
+      }
+    }
+  }
+}
+#sign_in_panel {
+  padding: 15px 10px;
+}
+.reg-info {
+  font-size: 1.25rem;
+  max-width: 750px;
+}
+.reg-btn {
+  background-color: #87c2ed;
+  margin-top: 10px;
+  &:hover {
+    background-color: #7ab2db;
+  }
+  &:focus, &:active {
+    box-shadow: 0 0 0 0.1rem #73a9d1 !important;
+  }
+}
+#sign_in_popup {
+  position: absolute;
+  left: -200%;
+  top: 115%;
+  width: 240px;
+  background-color: $dim;
+  border-radius: 3px;
+  border: 1px solid #bbb;
+  
+  &::before {
+    width: 0;
+    height: 0;
+    content: '';
+    border-top: 0;
+    border-right: 7px solid transparent;
+    border-bottom: .5em solid #c5c5c5;
+    border-left: 7px solid transparent;
+    position: absolute;
+    top: -8px;
+    left: 50%;
+  }
+  
+  .banner-form-element:not(:last-child) {
+    margin-bottom: 12px;
+  }
+  .form-control {
+    font-size: 0.9em;
+    border-radius: 1px;
+  }
+}
+.banner-form-err {
+  min-height: 25px;
+  display: inline-block;
+}
+.tooltip {
+  font-size: 0.8em;
+}
+.tooltip-inner {
+  background-color: #555;
+}
+.tooltip .arrow::before {
+  border-bottom-color: #555;
+}
+.related {
+  padding: 5px 10px;
+  .related-heading {
+    padding-bottom: 6px;
+    border-bottom: 1px solid #e5e5e5;
+    font-size: 1.04em;
+  }
+  .related-list {
+    li {
+      font-size: 0.9em;
+    }
+    li:not(:last-of-type) {
+      margin-bottom: 11px;
+    }
+    a:hover, a:focus {
+      text-decoration: underline;
+      border-left: 2px solid transparent;
+    }
+  }
+}
+
+/* Page Footer */
+.page-footer {
+  min-height: 40px; 
+  background-color: #222;
+  width: 100%;
+  font-size: 0.85em;
+  .page-footer-content {
+    padding: 12px $page_padding;
+    margin: 0 auto;
+    max-width: $max_width;
+    justify-content: center;
+    li {
+      padding: 0px 6px;
+      &:not(:last-of-type) {
+        border-right: 1px dotted #fff;
+      }
+    }
+  }
+  a {
+    color: #bbb;
+    &:hover {
+      color: #fff;
+      text-decoration: underline;
+    }
+  }
+}
+
+/* Media Queries */
+@media only screen and (max-width: 880px) { 
+  #search_area {
+    position: absolute;
+    display: none;
+    top: 100%;
+    margin: 0;
+    width: 100%;
+    left: 0;
+    min-width: 100%;
+    padding: 10px;
+    background-color: $dim;
+  }
+  #searchbar_trigger {
+    display: flex;
+  }
+}
+
+@media only screen and (max-width: 700px) { 
+  #logo {
+    background-image: url('../images/forashare_logo_min.png');
+    width: 48px;
+    background-size: auto 30px;
+  }
+}
+
+@media only screen and (max-width: 650px) {
+  .content-container {
+    flex-flow: column;
+  }
+  .sidebar {
+    border-right: 0px;
+    width: 100%;
+  }
+  .sidebar-navlist {
+    display: flex;
+    flex-flow: row;
+    border-bottom: 1px solid #aaa;
+    padding-bottom: 5px;
+    li:not(:last-of-type) {
+      margin-right: 6px;
+    }
+    li {
+      border: 0px;
+      &:not(:last-of-type) {
+        margin-bottom: 2px;
+      }
+      &.active-nav {
+        border: 0px;
+        background-color: #f5f5f5;
+      }
+      &:hover:not(.active-nav) {
+        background-color: #f8f8f8;
+        border-left: 0px;
+      }
+    }
+  }
+}
