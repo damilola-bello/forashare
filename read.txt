@@ -2,3 +2,6 @@ https://www.nationsonline.org/oneworld/country_code_list.htm
 https://www.britannica.com/topic/list-of-countries-1993160
 https://www.countryflags.com/en/yemen-flag-icon.html
 https://www.iconfinder.com/icons/2634312/ensign_flag_india_nation_icon
+
+HOW TO PUSH TO GITHUB
+https://help.github.com/articles/adding-an-existing-project-to-github-using-the-command-line/
