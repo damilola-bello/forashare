@@ -1,8 +1,142 @@
 <?php
+    include('includes/generic_includes.php');
+    //If the user is logged in and wants to go to the sign up page, redirect the user to the home page.
+    if ($loggedin == true) {
+      header("Location: index.php");
+      exit(); // Quit the script.
+    }
 
     $page_title = 'Sign up - ForaShare';
     $page = "signup";
     include('includes/header.php');
+
+    $submitted = false;
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+      $submitted = true;
+      //Validate sign up details
+
+      //Array to hold the errors
+      $signup_errors = [];
+
+      //username validation
+      $username = $_POST['username'];
+      if(empty($username)) {
+        $signup_errors[] = "Username cannot be empty.";
+      } else {
+        $username = trim($username);
+        $username_length = strlen($username);
+        if($username_length < 6 || $username_length > 25) {
+          $signup_errors[] = "Username can only have 6-25 characters.";
+        } else if (!preg_match("/^([a-zA-Z][a-zA-Z0-9_]{5,24})$/", $username)) {
+          $signup_errors[] = "Username must start with an alphabet and can only have alphabets, numbers and an underscore(_).";
+        }
+      }
+
+      //forum validation
+      $forum = $_POST['forum'];
+      if(empty($forum) || $forum == "empty") {
+        $signup_errors[] = "Choose a forum to belong to.";
+      } else {
+        //Escape harmful characters
+        $forum_sterilize = mysqli_real_escape_string($dbc, trim($forum));
+
+        $stmt = $dbc->prepare("SELECT forum_id FROM forum WHERE alpha_code = ?");
+        $stmt->bind_param("s", $forum_sterilize);
+        $stmt->execute();
+        //Get the result of the query
+        $result = $stmt->get_result();
+        if(!($result->num_rows === 1)) {
+          //If the alpha code submitted through the post doesn't belong to a valid forum
+          $signup_errors[] = "Choose a forum to belong to.";
+        } else {
+          //Get the forum id the new user belongs to
+          $row = $result->fetch_assoc();
+          $forum_id = $row['forum_id'];
+        }
+        //Close the statement
+        $stmt->close();
+        unset($stmt);
+      }
+
+      //email validation
+      $email = $_POST['email'];
+      if(empty($email)) {
+        $signup_errors[] = "Email cannot be empty.";
+      } else {
+        $email = trim($email);
+        //check if $email is a valid email
+        if(!filter_var($email, FILTER_VALIDATE_EMAIL)){
+          $signup_errors[] = "Enter a valid email address.";
+        } else {
+          //If the email is a valid one, check if the email is already registered
+
+          $stmt = $dbc->prepare("SELECT user_id FROM user WHERE email = ?");
+          $stmt->bind_param("s", $email);
+          $stmt->execute();
+          //Get the result of the query
+          $result = $stmt->get_result();
+          if($result->num_rows != 0) {
+            //If a user already exist with the same email
+            $signup_errors[] = "A user is already registered with the same email.";
+          }
+          //Close the statement
+          $stmt->close();
+          unset($stmt);
+        }
+      }
+
+      //password validation
+      $password1 = $_POST['password'];
+      $password2 = $_POST['password_verify'];
+      if(empty($password1) || empty($password2)) {
+        $signup_errors[] = "Enter a password in both password fields.";
+      } else {
+        $password1 = trim($password1);
+        $password2 = trim($password2);
+        //if the passwords don't match
+        if($password1 != $password2) {
+          $signup_errors[] = "Passwords don't match.";
+        } else {
+          //at this point, only $password1 will be used for the password since the previous condition ensured that $password1 == $password2
+          $password_length = strlen($password1);
+          if($password_length < 6 || $password_length > 20) {
+            $signup_errors[] = "Password must have 6-20 characters.";
+          }
+          if(!preg_match("/^([0-9]+[a-zA-Z_%*]+|[a-zA-Z_%*]+[0-9]+)[0-9a-zA-Z_%*]*$/", $password1)) {
+            $signup_errors[] = "Password must contain numbers and alphabets. Special characters like _*% are allowed.";
+          }
+        }
+      }
+
+      //After validating each field, check if there errors
+      if(empty($signup_errors)) {
+        //there are no errors, register the user
+        $empty_value = NULL;
+        $pass = password_hash($password1, PASSWORD_DEFAULT);
+        $stmt = $dbc->prepare("INSERT INTO user (user_id, email, password, username, info, date_joined, profile_image, forum_id, notification_check_date, last_forum_change) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?)");
+        $stmt->bind_param("sssssssss", $empty_value, $email, $pass, $username, $empty_value, $empty_value, $forum_id, $empty_value, $empty_value);
+        $stmt->execute();
+
+        //Check if the new record was added
+        if($stmt->affected_rows === 1) {
+          //Success
+        } else {
+          //Not able to register user
+        }
+        //Close the statement
+        $stmt->close();
+        unset($stmt);
+      } else {
+        //if there are errors with the fields
+        $error_lists = "";
+        //Each error message forms a list item
+        foreach ($signup_errors as $err) {
+          $error_lists .= "<li>$err</li>";
+        }
+      }
+
+    }
      
 ?>
 <!-- CONTAINER -->
@@ -21,30 +155,50 @@
   	  	</span>
   	  </div>
   	  <div class="reg-content flx-col">
+        <?php
+          //If the registration is complete without any errors
+          if($submitted == true && empty($error_lists)) {
+        ?>
+        <div class="reg-info">
+          <p>Registration complete!<br><br>You can now login using the tab above or by clicking <a href="login.php">here</a></p>
+        </div>
+        <?php
+          } else {
+        ?>
   	  	<div class="reg-info">
   	  	  <p>ForaShare is a platform where you can ask about things peculiar to a region and get response(s) from fellow users.<br>Easy and Simple!</p>
   	  	</div>
   	  	<div class="reg-form">
-  	  		<form method="post" action="#">
-            <div class="form-group">
-              <div class="form-error"></div>            
+  	  		<form method="post" method="post" class="signup-form" action="<?php echo $_SERVER['PHP_SELF']; ?>">
+            <div class="form-group form-error">
+              <?php 
+                if ($submitted == true && !empty($error_lists)) {
+                  echo '<ul>';
+                  echo $error_lists;
+                  echo '</ul>';            
+                }
+              ?>
             </div>
   	  		  <div class="form-group">
               <span class="form-lbl">Username</span>
-              <input type="text" name="username" placeholder="user123" class="form-control">
+              <input type="text" name="username" id="username_signup" tabindex="1" required minlength="6" maxlength="25" placeholder="user123" class="form-control" 
+              <?php if($submitted == true) { echo "value='" . $_POST['username'] . "'"; } ?> >
   	  		  </div>
 
             <div class="form-group">
-              <span class="form-lbl">Forum</span>
+              <div class="form-label-box row">
+                <span class="form-lbl">Forum</span>
+                <i class="far fa-question-circle label-info" tabindex="2" data-toggle="tooltip" data-placement="top" title="Choose a forum you want to belong to"></i>
+              </div>
               <?php
                   $query = "SELECT forum_name, alpha_code FROM forum ORDER BY forum_name ASC";
                   $r = mysqli_query($dbc, $query);
 
-                  echo '<select class="form-control">';
-                  echo '<option value="null" selected>-- Choose Forum --</option>';
+                  echo '<select class="form-control" name="forum" tabindex="3" id="forum_signup">';
+                  echo '<option value="empty">-- Choose Forum --</option>';
                   while ($row = mysqli_fetch_array($r, MYSQLI_ASSOC)) {
                     $alpha_code = $row['alpha_code'];
-                    echo "<option value='$alpha_code'>" . strtoupper($alpha_code) . " - " . $row['forum_name'] . "</option>"; 
+                    echo "<option value='$alpha_code'" . (($submitted == true && $_POST['forum'] == $alpha_code) ? ' selected' : ''). ">" . strtoupper($alpha_code) . " - " . $row['forum_name'] . "</option>"; 
                   }
                   echo '</select>';
               ?>
@@ -52,24 +206,31 @@
 
             <div class="form-group">
               <span class="form-lbl">Email</span>
-              <input type="text" name="email" placeholder="name@example.com" class="form-control">
+              <input type="email" name="email" id="email_signup" tabindex="4" required placeholder="name@example.com" class="form-control"
+              <?php if($submitted == true) { echo "value='" . $_POST['email'] . "'"; } ?>>
   	  		  </div>
   	  		  
   	  		  <div class="form-group">
-              <span class="form-lbl">Password</span>
-              <input type="text" name="password" placeholder="******" class="form-control">
+              <div class="form-label-box row">
+                <span class="form-lbl">Password</span>
+                <i class="far fa-eye label-info password-toggle" title="Show Password"></i>
+              </div>
+              <input type="password" name="password" id="password1_signup" tabindex="5" required minlength="6" maxlength="20" placeholder="******" class="form-control password-input">
   	  		  </div>
             
             <div class="form-group">
               <span class="form-lbl">Verify Password</span>
-              <input type="text" name="verify_password" placeholder="******" class="form-control">
+              <input type="password" name="password_verify" id="password2_signup" tabindex="6" required minlength="6" maxlength="20" placeholder="******" class="form-control password-input">
   	  		  </div>
 
             <div class="form-group">
-  	  			  <button class="btn reg-btn" type="submit">Sign Up</button>
+  	  			  <button class="btn reg-btn sign-up-submit" type="submit" tabindex="7">Sign Up</button>
             </div>
   	  		</form>
   	  	</div>
+        <?php
+          }
+        ?>
   	  </div>
   	</div>
   </div>
