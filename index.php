@@ -16,8 +16,8 @@
     include('includes/sidebar.php');
   ?>
   <div class="main-content">
-    <div class="ask-question-link-box row">
-      <a href="#" class="ask-question-link">Ask Question</button>
+    <div class="create-link-box row">
+      <a href="ask.php" class="create-link">Ask Question</a>
     </div>
   </div>
 </div>

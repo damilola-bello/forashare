@@ -26,9 +26,9 @@
       } else {
         $username = trim($username);
         $username_length = strlen($username);
-        if($username_length < 6 || $username_length > 25) {
-          $signup_errors[] = "Username can only have 6-25 characters.";
-        } else if (!preg_match("/^([a-zA-Z][a-zA-Z0-9_]{5,24})$/", $username)) {
+        if($username_length < 3 || $username_length > 25) {
+          $signup_errors[] = "Username can only have 3-25 characters.";
+        } else if (!preg_match("/^([a-zA-Z][a-zA-Z0-9_]{2,24})$/", $username)) {
           $signup_errors[] = "Username must start with an alphabet and can only have alphabets, numbers and an underscore(_).";
         }
       }
@@ -36,23 +36,23 @@
       //forum validation
       $forum = $_POST['forum'];
       if(empty($forum) || $forum == "empty") {
-        $signup_errors[] = "Choose a forum to belong to.";
+        $signup_errors[] = "Choose a country to belong to.";
       } else {
         //Escape harmful characters
         $forum_sterilize = mysqli_real_escape_string($dbc, trim($forum));
 
-        $stmt = $dbc->prepare("SELECT forum_id FROM forum WHERE alpha_code = ?");
+        $stmt = $dbc->prepare("SELECT tag_id FROM forum_details WHERE alpha_code = ?");
         $stmt->bind_param("s", $forum_sterilize);
         $stmt->execute();
         //Get the result of the query
         $result = $stmt->get_result();
         if(!($result->num_rows === 1)) {
           //If the alpha code submitted through the post doesn't belong to a valid forum
-          $signup_errors[] = "Choose a forum to belong to.";
+          $signup_errors[] = "Choose a country to belong to.";
         } else {
           //Get the forum id the new user belongs to
           $row = $result->fetch_assoc();
-          $forum_id = $row['forum_id'];
+          $forum_id = $row['tag_id'];
         }
         //Close the statement
         $stmt->close();
@@ -113,9 +113,10 @@
       if(empty($signup_errors)) {
         //there are no errors, register the user
         $empty_value = NULL;
+        $default = "DEFAULT";
         $pass = password_hash($password1, PASSWORD_DEFAULT);
-        $stmt = $dbc->prepare("INSERT INTO user (user_id, email, password, username, info, date_joined, profile_image, forum_id, notification_check_date, last_forum_change) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?)");
-        $stmt->bind_param("sssssssss", $empty_value, $email, $pass, $username, $empty_value, $empty_value, $forum_id, $empty_value, $empty_value);
+        $stmt = $dbc->prepare("INSERT INTO user (email, password, username, date_joined, tag_id) VALUES (?, ?, ?, NOW(), ?)");
+        $stmt->bind_param("ssss", $email, $pass, $username, $forum_id);
         $stmt->execute();
 
         //Check if the new record was added
@@ -123,6 +124,7 @@
           //Success
         } else {
           //Not able to register user
+          $error_lists = "<li>Unable to register you now. Please try again.</li>";
         }
         //Close the statement
         $stmt->close();
@@ -160,13 +162,13 @@
           if($submitted == true && empty($error_lists)) {
         ?>
         <div class="reg-info">
-          <p>Registration complete!<br><br>You can now login using the tab above or by clicking <a href="login.php">here</a></p>
+          <p>Registration complete!<br><br>You can now login using the tab above or <a href="login.php">click here to go to the login page</a>.</p>
         </div>
         <?php
           } else {
         ?>
   	  	<div class="reg-info">
-  	  	  <p>ForaShare is a platform where you can ask about things peculiar to a region and get response(s) from fellow users.<br>Easy and Simple!</p>
+  	  	  <h1 class="page-title">ForaShare is a platform where you can ask about things peculiar to a region and get response(s) from fellow users.</h1>
   	  	</div>
   	  	<div class="reg-form">
   	  		<form method="post" method="post" class="signup-form" action="<?php echo $_SERVER['PHP_SELF']; ?>">
@@ -181,24 +183,24 @@
             </div>
   	  		  <div class="form-group">
               <span class="form-lbl">Username</span>
-              <input type="text" name="username" id="username_signup" tabindex="1" required minlength="6" maxlength="25" placeholder="user123" class="form-control" 
+              <input type="text" name="username" id="username_signup" tabindex="1" required minlength="3" maxlength="25" placeholder="user123" class="form-control" 
               <?php if($submitted == true) { echo "value='" . $_POST['username'] . "'"; } ?> >
   	  		  </div>
 
             <div class="form-group">
               <div class="form-label-box row">
-                <span class="form-lbl">Forum</span>
-                <i class="far fa-question-circle label-info" tabindex="2" data-toggle="tooltip" data-placement="top" title="Choose a forum you want to belong to"></i>
+                <span class="form-lbl">Country</span>
+                <i class="far fa-question-circle label-info" tabindex="2" data-toggle="tooltip" data-placement="top" title="Choose a country you want to belong to"></i>
               </div>
               <?php
-                  $query = "SELECT forum_name, alpha_code FROM forum ORDER BY forum_name ASC";
+                  $query = "SELECT t.tag_name, f.alpha_code FROM forum_details AS f JOIN tag AS t ON t.tag_id = f.tag_id JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id ORDER BY t.tag_name ASC";
                   $r = mysqli_query($dbc, $query);
 
                   echo '<select class="form-control" name="forum" tabindex="3" id="forum_signup">';
-                  echo '<option value="empty">-- Choose Forum --</option>';
+                  echo '<option value="empty">-- Choose Country --</option>';
                   while ($row = mysqli_fetch_array($r, MYSQLI_ASSOC)) {
                     $alpha_code = $row['alpha_code'];
-                    echo "<option value='$alpha_code'" . (($submitted == true && $_POST['forum'] == $alpha_code) ? ' selected' : ''). ">" . strtoupper($alpha_code) . " - " . $row['forum_name'] . "</option>"; 
+                    echo "<option value='$alpha_code'" . (($submitted == true && $_POST['forum'] == $alpha_code) ? ' selected' : ''). ">" . strtoupper($alpha_code) . " - " . $row['tag_name'] . "</option>"; 
                   }
                   echo '</select>';
               ?>
@@ -224,7 +226,7 @@
   	  		  </div>
 
             <div class="form-group">
-  	  			  <button class="btn reg-btn sign-up-submit" type="submit" tabindex="7">Sign Up</button>
+  	  			  <button class="btn submit-btn sign-up-submit" type="submit" tabindex="7">Sign Up</button>
             </div>
   	  		</form>
   	  	</div>

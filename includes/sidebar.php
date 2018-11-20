@@ -6,22 +6,22 @@
       <?php
         if($loggedin == true) {
       ?>
-        <li <?php if($page == HOME) { echo "class='active-nav'"; } ?>>
+        <li class="home-nav<?php if($page == HOME) { echo ' active-nav'; } ?>">
           <a href="./index.php">Home</a>
         </li>
       <?php
         }
       ?>
-      <li <?php if($page == FORUM) { echo "class='active-nav'"; } ?>>
-        <a href="./forums.php">Forums</a>
+      <li class="countries-nav<?php if($page == FORUM) { echo ' active-nav'; } ?>">
+        <a href="./countries.php">Countries</a>
       </li>
-      <li <?php if($page == TOPIC) { echo "class='active-nav'"; } ?>>
-        <a href="./topics.php">Topics</a>
+      <li class="tags-nav<?php if($page == TOPIC) { echo ' active-nav'; } ?>">
+        <a href="./topics.php">Tags</a>
       </li>
-      <li <?php if($page == USER) { echo "class='active-nav'"; } ?>>
+      <li class="users-nav<?php if($page == USER) { echo ' active-nav'; } ?>">
         <a href="./users.php">Users</a>
       </li>
-      <li <?php if($page == QUESTION) { echo "class='active-nav'"; } ?>>
+      <li class="posts-nav<?php if($page == QUESTION) { echo ' active-nav'; } ?>">
         <a href="./questions.php">Questions</a>
       </li>
     </ul>

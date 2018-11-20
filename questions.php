@@ -11,22 +11,22 @@
     include('includes/sidebar.php');
   ?>
   <div class="main-content">
-    <div class="ask-question-link-box row">
-      <a href="#" class="ask-question-link">Ask Question</button>
+    <div class="create-link-box row">
+      <a href="ask.php" class="create-link">Ask Question</a>
     </div>
     <div class="main-container">
       <!-- Displays the filter area to filter questions according to forum and tags -->
       <div id="question_filter" class="search-box-filter">
         <div id="question_forum_list_box" class="row filter-forum-list-box">
           <?php
-            $query = "SELECT forum_name, alpha_code FROM forum ORDER BY forum_name ASC";
+            $query = "SELECT t.tag_name, f.alpha_code FROM forum_details AS f JOIN tag AS t ON t.tag_id = f.tag_id JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id WHERE tt.name = 'forum' ORDER BY t.tag_name ASC";
             $r = mysqli_query($dbc, $query);
 
             echo '<select class="form-control filter-forum-list">';
-            echo '<option value="globe">All Forums</option>';
+            echo '<option value="globe">All Countries</option>';
             while ($row = mysqli_fetch_array($r, MYSQLI_ASSOC)) {
               $alpha_code = $row['alpha_code'];
-              echo "<option value='$alpha_code'>" . $row['forum_name'] . "</option>";
+              echo "<option value='$alpha_code'>" . $row['tag_name'] . "</option>";
             }
             echo '</select>';
           ?>
@@ -34,15 +34,18 @@
         <div class="row filter-search-box">
           <div class="dropdown checkbox-dropdown-box" id="question_tags_dropdown">
 
-            <a class="dropdown-toggle" href="#" id="questionTagLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>tag</span>&nbsp;&nbsp;<i class="fas fa-tags"></i></a>
+            <a class="dropdown-toggle filter-dropdown-toggle" href="#" id="questionTagLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>topic</span>&nbsp;&nbsp;<i class="fas fa-tags"></i></a>
 
-            <ul class="dropdown-menu dropdown-menu-right checkbox-dropdown" aria-labelledby="questionTagLink">
-              <li class="dropdown-item" data-tag="religion" data-tag-check="1"><span class="question-tag-name" tabindex="-1"><input type="checkbox" checked="checked">&nbsp; Religion</span></li>
-              <li class="dropdown-item" data-tag="culture" data-tag-check="0"><span class="question-tag-name" tabindex="-1"><input type="checkbox">&nbsp; Culture</span></li>
-              <li class="dropdown-item" data-tag="politics" data-tag-check="0"><span class="question-tag-name" tabindex="-1"><input type="checkbox">&nbsp; Politics</span></li>
-              <li class="dropdown-item" data-tag="education" data-tag-check="1"><span class="question-tag-name" tabindex="-1"><input type="checkbox" checked="checked">&nbsp; Education</span></li>
-              <li class="dropdown-item" data-tag="sports" data-tag-check="0"><span class="question-tag-name" tabindex="-1"><input type="checkbox">&nbsp; Sports</span></li>
-              <li class="dropdown-item" data-tag="others" data-tag-check="1"><span class="question-tag-name" tabindex="-1"><input type="checkbox" checked="checked">&nbsp; Others</span></li>
+            <ul class="dropdown-menu menu-filter dropdown-menu-right checkbox-dropdown" aria-labelledby="questionTagLink">
+              <?php
+                //Select the default tags
+                $query = "SELECT tag_id, tag_name FROM tag AS t JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id WHERE tt.name = 'default_tag' ORDER BY t.tag_name ASC";
+                $r = mysqli_query($dbc, $query);
+                while ($row = mysqli_fetch_array($r, MYSQLI_ASSOC)) {
+                  $tag_name = strtolower($row['tag_name']);
+                  echo "<li class='dropdown-item' data-tag='$tag_name' data-tag-check='0'><span class='ask-question-tag-name' tabindex='-1'><input name='tag[]' value='$tag_name' type='checkbox'>&nbsp; $tag_name</span></li>";
+                }
+              ?>
             </ul>
           </div>
 
@@ -58,11 +61,11 @@
           <input type="text" class="form-control filter-input" placeholder="Filter Question">
 
           <div class="dropdown filter-order-dropdown" id="question_order_dropdown">
-            <a class="dropdown-toggle" href="#" id="questionSortLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">points</a>
-            <ul class="dropdown-menu dropdown-menu-right sort-dropdown" aria-labelledby="questionSortLink" id="question_sort">
-              <li class="dropdown-item active">points</li>
-              <li class="dropdown-item">oldest</li>
-              <li class="dropdown-item">newest</li>
+            <a class="dropdown-toggle filter-dropdown-toggle" href="#" id="questionSortLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">point</a>
+            <ul class="dropdown-menu menu-filter dropdown-menu-right sort-dropdown" aria-labelledby="questionSortLink" id="question_sort">
+              <li class="dropdown-item">new</li>
+              <li class="dropdown-item">old</li>
+              <li class="dropdown-item active">point</li>
             </ul>
           </div>
         </div>

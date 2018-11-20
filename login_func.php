@@ -39,7 +39,7 @@
 			      // Set the session data:
 			      session_start();
 			      $_SESSION['user_id'] = $row['user_id'];
-
+			      setcookie('in', true, time() + (86400 * 30), "/"); //cookie to set if logged in or not
 			      // Store the HTTP_USER_AGENT:
 			      $_SESSION['agent'] = sha1($_SERVER['HTTP_USER_AGENT']);
 				  // Return true and the record:

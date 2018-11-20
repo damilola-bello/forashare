@@ -75,7 +75,7 @@
   	  		  </div>
 
             <div class="form-group">
-  	  			  <button class="btn reg-btn login-submit" tabindex="3" type="submit">Login</button>
+  	  			  <button class="btn submit-btn login-submit" tabindex="3" type="submit">Login</button>
             </div>
 
   	  		</form>

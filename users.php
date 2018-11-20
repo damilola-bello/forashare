@@ -12,8 +12,8 @@
   ?>
   <div class="main-content">
 
-    <div class="ask-question-link-box row">
-      <a href="#" class="ask-question-link">Ask Question</button>
+    <div class="create-link-box row">
+      <a href="ask.php" class="create-link">Ask Question</a>
     </div>
     <div class="main-container">
 
@@ -44,8 +44,8 @@
           <input type="text" class="form-control filter-input" placeholder="Filter User">
 
           <div class="dropdown filter-order-dropdown">
-            <a class="dropdown-toggle" href="#" id="userSortLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">scores</a>
-            <ul class="dropdown-menu dropdown-menu-right sort-dropdown" aria-labelledby="userSortLink" id="user_sort">
+            <a class="dropdown-toggle filter-dropdown-toggle" href="#" id="userSortLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">scores</a>
+            <ul class="dropdown-menu menu-filter dropdown-menu-right sort-dropdown" aria-labelledby="userSortLink" id="user_sort">
               <li class="dropdown-item active">scores</li>
               <li class="dropdown-item">newer users</li>
               <li class="dropdown-item">older users</li>

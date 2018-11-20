@@ -11,8 +11,8 @@
     include('includes/sidebar.php');
   ?>
   <div class="main-content">
-    <div class="ask-question-link-box row">
-      <a href="#" class="ask-question-link">Ask Question</button>
+    <div class="create-link-box row">
+      <a href="ask.php" class="create-link">Ask Question</a>
     </div>
     <div class="main-container">
 
@@ -20,9 +20,9 @@
         <div class="row filter-search-box">
           <div class="dropdown checkbox-dropdown-box" id="question_tags_dropdown">
 
-            <a class="dropdown-toggle" href="#" id="regionsLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>region</span></a>
+            <a class="dropdown-toggle filter-dropdown-toggle" href="#" id="regionsLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>region</span></a>
 
-            <ul class="dropdown-menu dropdown-menu-right checkbox-dropdown" aria-labelledby="regionsLink">
+            <ul class="dropdown-menu menu-filter dropdown-menu-right checkbox-dropdown" aria-labelledby="regionsLink">
               <?php
                 $query = "SELECT region_id, region_name FROM region ORDER BY region_name ASC";
                 $r = mysqli_query($dbc, $query);
@@ -40,13 +40,13 @@
 
       <!-- Question filter header -->
       <div class="filter-header">
-        <p class="filter-title">All forums</p>
+        <p class="filter-title">All Countries</p>
         <div class="row filter-controls">
           <input type="text" class="form-control filter-input" placeholder="Filter Forum">
 
           <div class="dropdown filter-order-dropdown">
-            <a class="dropdown-toggle" href="#" id="forumSortLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">questions</a>
-            <ul class="dropdown-menu dropdown-menu-right sort-dropdown" aria-labelledby="forumSortLink">
+            <a class="dropdown-toggle filter-dropdown-toggle" href="#" id="forumSortLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">questions</a>
+            <ul class="dropdown-menu menu-filter dropdown-menu-right sort-dropdown" aria-labelledby="forumSortLink">
               <li class="dropdown-item active">questions</li>
               <li class="dropdown-item">users</li>
               <li class="dropdown-item">topics</li>
@@ -58,12 +58,12 @@
       <!-- List of Users -->
       <div class="lists-box" id="forums_list_grid">
         <?php
-            $query = "SELECT forum_name, alpha_code FROM forum ORDER BY forum_name ASC";
+            $query = "SELECT t.tag_name, f.alpha_code FROM forum_details AS f JOIN tag AS t ON t.tag_id = f.tag_id JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id WHERE tt.name = 'forum' ORDER BY t.tag_name ASC";
             $r = mysqli_query($dbc, $query);
 
             while ($row = mysqli_fetch_array($r, MYSQLI_ASSOC)) {
               $alpha_code = $row['alpha_code'];
-              $forum_name = $row['forum_name'];
+              $forum_name = $row['tag_name'];
 
               echo "<div class='preview row'>";
               echo "<div class='preview-image-box'>";

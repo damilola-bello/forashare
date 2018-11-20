@@ -15,8 +15,11 @@
       $errors = $err;
     } else {
       //If log in successful, redirect to home page.
-      header("Location: index.php");
-      exit(); // Quit the script.
+      //header("Location: index.php");
+      //exit(); // Quit the script.
+      //echo $_SERVER['REQUEST_URI'];
+      //exit();
+      $loggedin = true;
     }
   }
 ?>
@@ -35,13 +38,14 @@
       <!-- Popper JS -->
       <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"></script>
       <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.2/knockout-min.js"></script>
 
       <!-- Font Awesome -->
       <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.3.1/css/all.css" integrity="sha384-mzrmE5qonljUremFsqc01SB46JvROS7bZs3IO2EmfFsd15uHvIt+Y8vEf7N7fWAU" crossorigin="anonymous">
     <!-- END OF EXTERNAL FILES -->
-    <!-- GOOGLE FONTS -->
-    <link href='https://fonts.googleapis.com/css?family=Lato' rel='stylesheet'>
     <link href="css/main.css" rel="stylesheet" type="text/css">
+
+    <script src="javascript/main.js"></script>
   </head>
   <body>
     <!-- SEARCH BLUR -->
@@ -60,7 +64,7 @@
         </div>
         <div id="top_bar" class="row">
            <div class="row" id="logo_search">
-            <a href="<?php echo dirname($_SERVER['PHP_SELF']) . '/'; ?>">
+            <a href="<?php echo pageDir() . '/'; ?>">
               <span id="logo" class="row align-items-center"></span>
             </a>
             <div id="search_area" class="row align-items-center">
@@ -69,7 +73,7 @@
               </div>
               <div id="search_region" class="row">
                 <?php
-                  $query = "SELECT forum_name, alpha_code FROM forum ORDER BY forum_name ASC";
+                  $query = "SELECT t.tag_name, f.alpha_code FROM forum_details AS f JOIN tag AS t ON t.tag_id = f.tag_id JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id WHERE tt.name = 'forum' ORDER BY t.tag_name ASC";
                   $r = mysqli_query($dbc, $query);
 
                   //Image for the globe to search all forums
@@ -79,7 +83,7 @@
                   echo '<option value="globe">All</option>';
                   while ($row = mysqli_fetch_array($r, MYSQLI_ASSOC)) {
                     $alpha_code = $row['alpha_code'];
-                    echo "<option value='$alpha_code'>" . strtoupper($alpha_code) . " - " . $row['forum_name'] . "</option>"; 
+                    echo "<option value='$alpha_code'>" . strtoupper($alpha_code) . " - " . $row['tag_name'] . "</option>"; 
                     $search_flag .= "<img src='images/forum-32/$alpha_code.png' class='banner-search-image' data-code='$alpha_code'>";
                   }
                   echo '</select>';
@@ -96,25 +100,21 @@
           <div id="banner_controls" class="row">
             <?php
               if ($loggedin == false && ($page != "login" && $page != "signup")) {
+                $show_login_popup = "";
+                if($login_submitted == true && !empty($errors)) {
+                  $show_login_popup = "show";
+                }
             ?>
             <!-- REGISTER GREETING <ONLY VISIBLE FOR USERS NOT LOGGED IN> -->
             <ul id="register_greeting" class="row">
-              <li class="p-relative reg-access" id="banner_signin">
-                  <a href="#" class="sign-in">
+              <li class="p-relative reg-access dropdown <?php echo $show_login_popup; ?>" id="banner_signin">
+                  <a href="#" class="sign-in dropdown-toggle reg-access-link" data-toggle="dropdown">
                     <span>Sign in</span>
-                    <i class="fas fa-caret-<?php if($login_submitted == true && !empty($errors)) {
-                      echo "up";
-                    } else {
-                      echo "down";
-                    }?> login-icon"></i>
                   </a>
-                  <div id="sign_in_popup" 
-                    <?php if($login_submitted == true && !empty($errors)) {
-                      echo " class='open-signin-popup'";
-                    } ?>
-                  >
+
+                  <div id="sign_in_popup" class="dropdown-menu dropdown-menu-right <?php echo $show_login_popup; ?>">
                     <div id="sign_in_panel">
-                      <form method="post" class="login-form" action="<?php echo $_SERVER['PHP_SELF']; ?>">
+                      <form method="post" class="login-form" action="<?php echo pageURL(); ?>">
                         <div class="form-group form-error">
                           <?php if($login_submitted == true && !empty($errors)) {
                             echo '<ul>';
@@ -138,7 +138,7 @@
                           <input type="password" tabindex="2" required class="form-control banner-form-element password-input password-login" name="password" placeholder="******">
                         </div>
                         <div class="form-group">
-                          <button type="submit" tabindex="3" class="btn banner-form-element reg-btn banner-login-submit">Sign In</button>
+                          <button type="submit" tabindex="3" class="btn banner-form-element submit-btn banner-login-submit">Sign In</button>
                         </div>
                         <input type="hidden" name="banner-login-form" value="bannerLoginForm"/>
                       </form>
@@ -146,7 +146,7 @@
                   </div>
               </li>
               <li class="reg-access">
-                <a href="./signup.php"> Sign Up </a>
+                <a href="./signup.php" class="reg-access-link"> Sign Up </a>
               </li>
             </ul>
             <!-- END OF REGISTER GREETING -->
@@ -162,7 +162,8 @@
                 <li id="follow_activity" class="banner-icon" data-toggle="tooltip" data-placement="bottom" title="New followers">
                   <i class="fas fa-user-plus ico"></i>
                 </li>
-                <li id="profile" class="banner-icon" title="Profile">
+                <li id="profile" class="banner-icon">
+                  <a href="user.php?id=<?php echo $_SESSION['user_id']; ?>" class="banner-profile-pic-link" title="Go to your Profile Page">
                   <!-- Set the profile icon -->
                   <?php
                     if(isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
@@ -173,55 +174,49 @@
                       $result = $stmt->get_result();
                       if($result->num_rows === 1) {
                         $row = $result->fetch_assoc();
-                        if(empty($row['profile_image'])) {
-                          $icon_char = strtoupper(substr($row['username'], 0, 1));
-                          echo "<span class='profile-icon-letter'>$icon_char</span>";
-                        }
+                        $image = ($row['profile_image'] == null) ? 'images/user_icon.png': 'images/'.$row['profile_image'];
+                        echo "<img class='profile-icon-pic' src = '$image' />";
                       } 
                       //Close the statement
                       $stmt->close();
                       unset($stmt);
                     }
                   ?>
+                  </a>
                 </li>
               </ul>
               <div class="row divider">
                 <i class="fas fa-ellipsis-v"></i>
               </div>
-              <div id="more_options">
-                <div class="banner-icon" id="options">
-                  <i class="fas fa-caret-down ico"></i>
-                  <div id="more_options_popup">
-                    <div>
-                      <ul id="banner_more_options_list">
-                        <li>
-                          <a href="#" class="more-options-link">Create Topic</a>
-                        </li>
-                        <li class="options-separator"></li>
-                        <li>
-                          <a href="#" class="more-options-link">Profile</a>
-                        </li>
-                        <li>
-                          <a href="#" class="more-options-link">Posts</a>
-                        </li>
-                        <li class="options-separator"></li>
-                        <li>
-                          <a href="#" class="more-options-link">Activity Log</a>
-                        </li>
-                        <li>
-                          <a href="#" class="more-options-link">New Followers</a>
-                        </li>
-                        <li>
-                          <a href="#" class="more-options-link">Notifications</a>
-                        </li>
-                        <li class="options-separator"></li>
-                        <li>
-                          <a href="./logout.php" class="more-options-link">Logout</a>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
+              <div id="more_options" class="dropdown">
+                <div class="banner-icon dropdown-toggle" id="options" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                 </div>
+                <ul class="dropdown-menu dropdown-menu-right" id="more_options_menu" aria-labelledby="options">
+                  <li class="dropdown-item">
+                    <a href="#" class="more-options-link">Create Topic</a>
+                  </li>
+                  <li class="dropdown-divider"></li>
+                  <li class="dropdown-item">
+                    <a href="user.php?id=<?php echo $_SESSION['user_id']; ?>" class="more-options-link">Profile</a>
+                  </li>
+                  <li class="dropdown-item">
+                    <a href="#" class="more-options-link">Posts</a>
+                  </li>
+                  <li class="dropdown-divider"></li>
+                  <li class="dropdown-item">
+                    <a href="#" class="more-options-link">Activity Log</a>
+                  </li>
+                  <li class="dropdown-item">
+                    <a href="#" class="more-options-link">Followers</a>
+                  </li>
+                  <li class="dropdown-item">
+                    <a href="#" class="more-options-link">Notifications</a>
+                  </li>
+                  <li class="dropdown-divider"></li>
+                  <li class="dropdown-item">
+                    <a href="./logout.php?redirect=<?php echo base64_encode(pageURL()); ?>" class="more-options-link">Logout</a>
+                  </li>
+                </ul>
               </div>
             </div>
             <!-- END OF CONTROLS FOR LOGGED IN USER -->
@@ -234,3 +229,18 @@
       </div>
     </header>
     <!-- PAGE HEADER END -->
+    <div class="fontsize-adjust row">
+      <div class="fontsize-toggler row" title="Adjust Font Size">
+        <span>A</span>
+      </div>
+      <div class="fontsize-tray">
+        <div class="row fontsize-heading">
+          <span>Font Size</span>
+        </div>
+        <div class="row reset-font-box">
+          <a href="#" class="reset-font" onclick="return resetFont(this);">reset</a>
+        </div>
+        <span class="fontsize-text row">Aa</span>
+        <input class="fontsize-range" id="fontSizeRange" onchange="changeFontSize(this)" type="range" min="10" max="19" value="16">
+      </div>
+    </div>

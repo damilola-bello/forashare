@@ -3,35 +3,50 @@ const SEARCH_BAR_THRESHOLD = 880; //below this width hide the search bar
 const SIDEBAR_TOGGLE_WIDTH = 650; //This width and below the sidebar is shrunk
 const EMAIL_PATT = /^[A-Za-z0-9._%-]{1,64}@[A-Za-z0-9.-]+\.[A-Za-z]{2,6}$/;
 var searchActive = false;
+var clickEl = '';
 
-$(document).ready(function(){
+$(document).ready(function() {
+  /* EVENTS */
+  
   //Initialize bootstrap tooltip
   $('[data-toggle="tooltip"]').tooltip({delay: {show: 500, hide: 100}});
   
   $('#searchbar_trigger').on('click', searchbarToggle);
-  $('.sign-in').on('click', bannerLoginFormToggle);
-  $('#options').on('click', optionsToggle);
+  
   //sign up click
   $('.signup-form').on('submit', validateSignUp);
   //login click
   $('.login-form').on('submit', validateLoginPage);
   $('.password-toggle').on('click', togglePassword);
   
+  //fontsize-toggler 
+  $('.fontsize-toggler').on('click', toggleAdjustFontsize);
+  
+  //track progress
+  $('.progressable-input').on('keyup', updateProgress);
+  $('.progressable-input').on('paste', updateProgress);
+  
   //sidebar click
   $('.sidebar').on('click', preventBubbling);
-  //more options click
-  $('#more_options_popup').on('click', preventBubbling);
-  
   
   $('#hamburger_box').click(togglePageNavigation);
+  
+  $('.info-content-toggle').on('click', showHelp);
+  $('.info-subcontent-title').on('click', showHelpSubcontent);
   
   //Prevent click on login/sign up when active
   $('.reg-tab-active').on('click', function(e) {
     e.preventDefault();
-  })
+  });
+  
+  $('.post-attributes .post-action').on('click', postActionClick);
+  
+  //toggle zoom image
+  $('.post .post-image').on('click', toggleImageZoom);
+  
   $('body').on('click', bodyClick);
   
-  $('#question_tags_dropdown .dropdown-item').on( 'click', toggleQuestionTagsDDL);
+  $('.checkbox-dropdown-box .dropdown-item').on( 'click', toggleTagsDDL);
   
   $(window).resize(windowResize);  
   $('#page_search_input').focusin(function(){
@@ -41,6 +56,8 @@ $(document).ready(function(){
     
     //blur the rest of the page when the search input is in focus
     $('.search-page-blur').fadeIn();
+    
+    clickEl = 'page_search_input';
   });
   $('#page_search_input').focusout(function(){
     $('.search-forum-list').removeClass('focus');
@@ -53,30 +70,492 @@ $(document).ready(function(){
   
   //Get the width of the browser on load and set lastWidth
   lastWidth = getWindowWidth();
+
+  //check if font-size cookie exist, if so, update the font size of the page
+  var font = getCookie('font');
+  if(font.length > 0) {
+    slideFontSlider(document.getElementById('fontSizeRange'), font);
+  }
 });
 
-function toggleQuestionTagsDDL(event) {
-   var $target = $( event.currentTarget ),
-       val = $target.attr('data-tag'),
-       checked = $target.attr('data-tag-check'),
-       $inp = $target.find('input'),
-       idx;
+function toggleEligibilityInfo(input) {
+  $info = $(input).closest('.post-eligibility-info-box').find('.eligibility-info').toggleClass('hide');
+  if($info.hasClass('hide')) {
+    $(input).attr('title', 'Show Info');
+  } else {
+    $(input).attr('title', 'Hide Info');
+  }
+}
 
-   if (checked === '0') {
-      setTimeout( function() { 
-        $inp.prop( 'checked', true ); 
-        $target.attr( 'data-tag-check', '1' ); 
-      }, 0);
-   } else if (checked === '1') {
-      setTimeout( function() { 
-        $inp.prop( 'checked', false ) ;
-        $target.attr( 'data-tag-check', '0' ); 
-      }, 0);
-   }
+function commentActionClick(koObject, e) {
+  postActionClick(e);
+}
 
+var $lastPostActionEl = '';
+function postActionClick(e) {
+  var $target = $(e.currentTarget);
+  var loggedin = (getCookie('in').length == 0) ? false : true;
+  
+  
+  if(loggedin == false) {
+    var open = '<div class="login-popover"><p class="login-popover-header">';
+    var open_sm = '<div class="login-popover sm"><p class="login-popover-header">';
+    var end = '</p><span class="login-popover-body"><span class="popover-msg">To make your opinion count you need to sign in.</span><span class="popover-login-prompt"><a title="Go to Sign in page" href="login.php">SIGN IN</a></span></span></div>';
+    if($lastPostActionEl != '' && $lastPostActionEl[0] != $target[0]) {
+      $('[rel=popover]').popover('hide');
+    }
+    $('body').popover('dispose');
+    $('body').popover({
+      selector: '[rel=popover]',
+      trigger: 'click',
+      content : function(){
+        var popoverContent = '';
+        var popoverType = $target.attr('data-action-type');
+        switch (popoverType) {
+          case 'post-like': 
+            popoverContent = open+"Like this Post?"+end;
+            break;
+          case 'post-dislike': 
+            popoverContent = open+"Don't like this Post?"+end;
+            break;
+          case 'post-save': 
+            popoverContent = open+"Need to save this Post?"+end;
+            break;
+          case 'comment-like': 
+            popoverContent = open_sm+"Like this Comment?"+end;
+            break;
+          case 'comment-dislike': 
+            popoverContent = open_sm+"Don't like this Comment?"+end;
+            break;
+        }
+        return popoverContent;
+      },
+      placement: "bottom",
+      html: true
+    });
+  }
+  
+  //store the last element
+  $lastPostActionEl = $target;
+}
+
+function toggleImageZoom(e) {
+  var $target = $(e.currentTarget);
+  $target.toggleClass('min max');
+  if($target.hasClass('min')) {
+    $target.attr('title', 'Zoom In');
+  } else {
+    $target.attr('title', 'Zoom Out');
+  }
+}
+
+function updateProgress(e) {
+  var $target = $(e.currentTarget);
+  //current length - trimmed
+  var currentLength = $target.val().trim().length;
+  //get last length 
+  var lastLength = $target.attr('data-last-length');
+  
+  //remove error layer if any but dont detach event
+  removeError(e, false);
+  
+  if(currentLength != lastLength) {
+    //get the SVG
+    var $SVG = $target.closest('.form-group').find('.progress-input-box');
+    //get the progress-value circle
+    var $progressValueCircle = $SVG.find('.progress-value');
+    //get the char left span
+    var $progressOverEl = $SVG.find('.progress-char-left');
+    //get the stroke-dasharray
+    var strokeDashArray = parseFloat($progressValueCircle.attr('stroke-dasharray'));
+    //get the max-length
+    var maxLength = $target.attr('data-max');
+    var charLeft = maxLength - currentLength;
+    //over
+    if(currentLength > maxLength) {
+      $progressValueCircle.attr('stroke-dashoffset', `0rem`);
+      $progressValueCircle.removeClass('progress-warn').addClass('progress-over');
+      percentDone = 1.0;
+      $progressOverEl.removeClass('warn-value').text(charLeft);
+    } else {
+      $progressValueCircle.removeClass('progress-over');
+      if(charLeft <= 10) {
+        //show warning color(amber) if characters left is less than or equal to 10
+        $progressOverEl.addClass('warn-value').text(charLeft);
+        $progressValueCircle.addClass('progress-warn');
+      } else {
+        $progressValueCircle.removeClass('progress-warn')
+        $progressOverEl.empty();
+      }
+      //get the percent
+      var percentDone = currentLength/maxLength;
+      //calculate the stroke-dashoffset
+      var strokeDashOffset = parseFloat(strokeDashArray * (1 - percentDone));
+      //update the stroke-dashoffset
+      $progressValueCircle.attr('stroke-dashoffset', `${strokeDashOffset}rem`);
+    }
+    //set the title
+    $SVG.attr('title', `[ ${currentLength} / ${maxLength} ]`);
+    //update the length 
+    $target.attr('data-last-length', currentLength);
+  }
+}
+
+function setCookie(cname,cvalue,exdays) {
+  var d = new Date();
+  d.setTime(d.getTime() + (exdays*24*60*60*1000));
+  var expires = `expires=${d.toGMTString()}`;
+  document.cookie = `${cname}=${cvalue}; ${expires}; path=/`;
+}
+
+function getCookie(cname) {
+  var name = cname + "=";
+  var decodedCookie = decodeURIComponent(document.cookie);
+  var ca = decodedCookie.split(';');
+  for(var i = 0; i < ca.length; i++) {
+      var c = ca[i];
+      while (c.charAt(0) == ' ') {
+          c = c.substring(1);
+      }
+      if (c.indexOf(name) == 0) {
+          return c.substring(name.length, c.length);
+      }
+  }
+  return "";
+}
+
+function removeCookie(cname) {
+  document.cookie = `${cname}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+}
+
+function slideFontSlider(input, size) {
+  $(input).val(size);
+  changeFontSize(input);
+}
+
+function changeFontSize (input) {
+  //get the font-size
+  var fontsize = $(input).val();
+  $(":root").css('font-size', `${fontsize}px`);
+
+  //set the cookie to the new font size
+  setCookie('font', fontsize, 30);
+}
+
+function toggleAdjustFontsize(e){
+  var $target = $(e.currentTarget);
+  var $box = $target.closest('.fontsize-adjust');
+  //if open, close it
+  if($box.hasClass('open')) {
+    slideLeftOrRight(0, -160, $box, true);
+  } else {
+    slideLeftOrRight(-160, 0, $box, true);
+  }
+}
+
+function resetFont(input) {
+  //remove the font-size inline style
+  $(":root").css('font-size', '');
+  //get the default font-size
+  var size = parseInt($(":root").css('font-size'));
+  //get the font-range and update it to the default font-size
+  $(input).closest('.fontsize-tray').find('.fontsize-range').val(size);
+  
+  //remove the font cookie
+  removeCookie('font');
+  
+  //prevent default
+  return false;
+}
+
+function slideLeftOrRight(start, end, $element, isLeft) {
+  var minus = (start < end) ? false : true;
+  var pos = (isLeft) ? 'left' : 'right';
+  //duration is 1 second
+  //get the difference between the two points
+  var diff = Math.abs(start - end);
+  var bits = diff/70;//call the interval every 1ms; 70 times in total.
+  var installment = start;
+  
+  var slide = setInterval(function() {
+    //add or subtract the increment/decrement
+    installment = (minus) ? installment -= bits : installment += bits;
+    //update DOM
+    $element.css(pos, installment);
+    //check if complete
+    if((minus && installment <= end) || (!minus && installment >= end)) {
+      clearInterval(slide);
+      $element.css(pos, end);
+      
+      //toggle 'open' class
+      $element.toggleClass('open');
+    }
+  }, 1)
+}
+
+function clearImgUpload(e) {
+  var $target = $(e);
+  var imgWrapper = $target.closest('.image-upload-preview');
+  //remove the image
+  imgWrapper.find('.upload-preview-image').empty();
+  //empty the file input value
+  imgWrapper.find('.upload-image').val('');
+  //change the prompt text
+  imgWrapper.find('.upload-prompt-text').text('Select Image');
+  //if image 1 is removed, and image 2 is empty, hide image 2 or if image 2 is removed, hide it
+  if(imgWrapper.attr('id') === 'ask_img_1_box' && $('#ask_img_2').val().length == 0 || (imgWrapper.attr('id') === 'ask_img_2_box')) {
+    $('#ask_img_2_box').addClass('hide');
+  }
+}
+
+function togglePhotoBox(el) {
+  //find the box, then find the toggle switch
+  var $switch = $(el).closest('.add-photos-lbl').find('.switch input[type="checkbox"]');
+  var checkboxEl = $switch[0];
+  checkboxEl.checked = !checkboxEl.checked;
+  addPhotosToggle(checkboxEl);
+}
+
+function addPhotosToggle (e) {
+  if(e.checked) {
+    $('#image_upload_box').removeClass('hide').css('display', 'flex');
+  } else {
+    $('#image_upload_box').addClass('hide');
+  }
+}
+
+function uploadQuestionImg(input) {
+  var imgURL = '';
+  if (input.files && input.files[0]) {
+    var imageType = input.files[0].type;
+    if(!(imageType === 'image/jpeg' || imageType === 'image/png' || imageType === 'image/gif')) {
+      //wrong file type
+      alert('Wrong Image type.\nYou can only upload a jpeg, png or gif image.');
+      $(input).val('');
+      return;
+    }
+    
+    var imageSize = input.files[0].size;
+    if(imageSize > 1048576) {
+      //image more than 1MB is too large
+      alert('Image too large.\nImage can not be more than 1MB in size.');
+      $(input).val('');
+      return;
+    }
+    
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      //image data
+      imgURL = e.target.result;
+      //find the img tag
+      $target = $(input);
+      var imgWrapper = $target.closest('.image-upload-preview').find('.upload-preview-image');
+      imgWrapper.empty().append(`<img src="${imgURL}" class="question-upload-img"><span class="delete-img-upload" onclick="clearImgUpload(this);">&times;</span>`);
+      
+      //change the name of the buttton
+      $target.siblings('.upload-prompt-text').text('Change');
+      
+      //if the first image is uploaded, display the second one
+      if($target.attr('id') === 'ask_img_1') {
+        $('#ask_img_2_box').removeClass('hide');
+      }
+      
+    };
+    //get the image data
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+function showHelpSubcontent(e) {
+  var $target = $(e.currentTarget);
+  $target.toggleClass('open');
+}
+
+function showHelp(e) {
+  var $target = $(e.currentTarget);
+  $target.toggleClass('open');
+}
+
+function askQuestionSubmit() {
+  //validate form before submission
+  //reset the eroor messages
+  var $errorBox = $('#ask_question_form').find('.form-error');
+  
+  $errorBox.empty();
+  $('.error-lbl').empty();
+  //get form elements
+  var headingEl = $('#ask_question_form').find('.question-heading').removeClass('err')[0];
+  var heading = headingEl.value.trim();
+  
+  var bodyEl = $('#ask_question_form').find('.question-body').removeClass('err')[0];
+  var body = bodyEl.value.trim();
+  
+  var forumEl = $('#ask_question_form').find('.question-forum').removeClass('err')[0];
+  var forum = forumEl.value.trim();
+  
+  var imageBox = $('#ask_question_form .image-upload-box').removeClass('err');
+  var image1 = imageBox.find('#ask_img_1_box input[type="file"]')[0].files[0];
+  var image2 = imageBox.find('#ask_img_2_box input[type="file"]')[0].files[0];
+  
+  var tagsBox = $('.dropdown-toggle');
+  var tags = $('#ask_question_form').find('.checkbox-dropdown .question-tags');
+  var tag_ids = [];
+  
+  var errCount = 0;
+  
+  //heading validation
+  if(heading.length < 5 || heading.length > 100) {
+    var txt = '';
+    if(heading.length <= 0) {
+      txt = 'Question Heading cannot be empty.';
+    } else if(heading.length < 5) {
+      txt = 'Question Heading too short.';
+    } else {
+      txt = 'Question heading cannot be more than 100 characters.';
+    }
+    $('.question-heading-err').text(txt);
+    $(headingEl).addClass('err');
+    
+    errCount++;
+  }
+  
+  //body validation
+  if(body.length < 10 || body.length > 1500) {
+    var txt = '';
+    if(body.length <= 0) {
+      txt = 'Question body cannot be empty.'; 
+    } else if (body.length < 10) {
+      txt = 'Question body too short.';
+    } else {
+      txt = 'Question body cannot be more than 1500 characters.';
+    }
+    $('.question-body-err').text(txt);
+    $(bodyEl).addClass('err');
+    errCount++;
+  }
+  
+  //forum validation
+  if(forum == "empty") {
+    $('.question-forum-err').text("Select a country to post to.");
+    $(forumEl).addClass('err');
+    //add event so when the input changes, the error disappers
+    $(forumEl).on('change', removeError);
+    errCount++;
+  }
+  
+  //tags validation
+  for(var i = 0; i < tags.length; i++) {
+    //store the names of the tags
+    if(tags[i].checked === true) {
+      tag_ids.push(tags[i].value);
+    }
+  }
+  if(tag_ids.length == 0) {
+    $('.question-tag-err').text("You must attach at least one topic to your question.");
+    tagsBox.addClass('err');
+    errCount++;
+  } else if(tag_ids.length > 3) {
+    $('.question-tag-err').text("You can't attach more than three topics to your question.");
+    tagsBox.addClass('err');
+    errCount++;
+  }
+  
+  //images validation
+  
+  //if there are no errors
+  if(errCount == 0) {
+    $('.ask-question-loading').removeClass('hide');
+    
+    var formData = new FormData();
+    formData.append('heading', heading);
+    formData.append('body', body);
+    formData.append('forum', forum);
+    formData.append('tags', JSON.stringify(tag_ids));
+    formData.append('image1', image1);
+    formData.append('image2', image2);
+    $.ajax({
+      url: "make_post.php",
+      data: formData,
+      processData: false,
+      contentType: false,
+      type: 'POST',
+      success: function(data) {
+        var dataObj = JSON.parse(data);
+        var msg = dataObj.message;
+        
+        if(dataObj.isErr === true) {
+          //displayError(msg, $errorBox);         
+        } else if(dataObj.isErr === false) {
+          window.location.replace( `${window.location.protocol}//${window.location.host}/forashare/question.php?id=${msg}` );
+        }
+        $('.ask-question-loading').addClass('hide');
+      },
+      error(xhr,status,error) {
+        /*var errArr = ["An error occured."];
+        displayError(errArr, $errorBox);*/
+        $('.ask-question-loading').addClass('hide');
+      }
+    });
+  }
+}
+
+function displayError(errorArray, $errorBox) {
+  var ul = "<ul>";
+  for(var i = 0; i < errorArray.length; i++) {
+    ul += `<li>${errorArray[i]}</li>`;
+  }
+  ul += '</ul>';
+
+  //append the error(s) to the error box
+  $errorBox.append(ul);
+}
+
+function removeError(e, detach = true) {
+  var wrapper = $(e.currentTarget);
+  if(wrapper.hasClass('err')) {
+    //remove the error class
+    wrapper.removeClass('err');
+    //empty the error message
+    wrapper.closest('.form-group').find('.error-lbl').empty();
+    
+    //detach the event
+    if(detach) {
+      $(this).off(e.type.trim());
+    }
+  }
+}
+
+function toggleTagsDDL(event) {
+  var $target = $( event.currentTarget ),
+     val = $target.attr('data-tag'),
+     checked = $target.attr('data-tag-check'),
+     $inp = $target.find('input'),
+     idx;
+
+  if (checked === '0') {
+    setTimeout( function() {
+      //check checkbox
+      $inp[0].checked = true;
+      $target.attr( 'data-tag-check', '1' ); 
+    }, 0);
+  } else if (checked === '1') {
+    setTimeout( function() { 
+      //uncheck checkbox
+      $inp[0].checked = false;
+      $target.attr( 'data-tag-check', '0' ); 
+    }, 0);
+  }
+
+  var toggleBox = $target.closest('.form-group').find('.dropdown-toggle');
+  //if the togglebox has err class and it belongs to askQuestionTagLink, reset it
+  if(toggleBox.attr('id') == 'askQuestionTagLink' && toggleBox.hasClass('err')) {
+    toggleBox.removeClass('err');
+    toggleBox.closest('.form-group').find('.error-lbl').empty();
+  }
+  
    $( event.target ).blur();
       
-   return false;
+  return false;
 }
 
 function preventBubbling(e) {
@@ -84,62 +563,29 @@ function preventBubbling(e) {
   e.stopPropagation();
 }
 
-function optionsToggle(e) { 
-  //if the click was generated from options pop up
-  var optionsPopupClick = ($(e.target).closest('#more_options_popup').length === 1) ? true : false;
-  $('#options').toggleClass('open-options');
-  if($('#options').hasClass('open-options') && optionsPopupClick == false) {
-    $('#more_options_popup').show();
-    $('#options').addClass('banner-icon-active');
-  } else if((!$('#options').hasClass('open-options')) && optionsPopupClick == false) {
-    $('#more_options_popup').hide();
-    $('#options').removeClass('banner-icon-active');
-  }
-  //If the hamburger nav is open, close it
-  if($('#hamburger_box').hasClass('open-nav')) {
-    sidebarHide();
-  }
-  //If searchbar is active, close it
-  if($('#searchbar_trigger').hasClass('banner-icon-active')) {
-    searchbarHide();
-  }
-  //prevent event bubbling
-  preventBubbling(e);
-}
-
 function sidebarHide(){
   $('#hamburger_box').removeClass('open-nav');
   sidebarSlideUp();
-}
-
-function optionsHide(){
-  $('#options').removeClass('open-options');
-  $('#more_options_popup').hide();
-  $('#options').removeClass('banner-icon-active');
 }
 
 function togglePageNavigation(e) {
   $('#hamburger_box').toggleClass('open-nav');
   if($('#hamburger_box').hasClass('open-nav')) {
     sidebarSlideDown();
+    clickEl = 'hamburger_box';
   } else {
     sidebarSlideUp();
-  }
-  //If the options drop down is open, close it
-  if($('#options').hasClass('open-options')) {
-    optionsHide();
   }
   //If searchbar is active, close it
   if($('#searchbar_trigger').hasClass('banner-icon-active')) {
     searchbarHide();
   }
-  //prevent bubbling
-  preventBubbling(e);
 }
 
 function sidebarSlideDown() {
   $('.sidebar').show();
 }
+
 function sidebarSlideUp() {
   $('.sidebar').hide();
 }
@@ -170,6 +616,12 @@ function changeSearchFlag() {
 
 //This function handles any click that occurs on the page
 function bodyClick(e) {
+  //if the search was clicked
+  if(clickEl == 'page_search_input') {
+    clickEl = '';
+    return;
+  }
+  
   var $target = $(e.target);
   //if search is active
   if(searchActive === true) {
@@ -180,14 +632,14 @@ function bodyClick(e) {
       searchActive = false;
     }
   }
-  
+  //if the hamburger box was clicked
+  if(clickEl == 'hamburger_box') {
+    clickEl = '';
+    return;
+  }
   //If the hamburger nav is open and the click was outside it, close it
   if($('#hamburger_box').hasClass('open-nav')) {
     sidebarHide();
-  }
-  //If the options drop down is open and the click was outside it, close it
-  if($('#options').hasClass('open-options')) {
-    optionsHide();
   }
 }
 
@@ -236,8 +688,8 @@ function validateSignUp(e) {
   var password2 = $('#password2_signup').val().trim();
   
   //username must start with a capital letter and must contain numbers and characters
-  var username_patt = /^([a-zA-Z][a-zA-Z0-9_]{5,24})$/;///^[a-zA-Z0-9_]{6,25}$/;
-  var password_patt = /^([0-9]+[a-zA-Z_%*]+|[a-zA-Z_%*]+[0-9]+)[0-9a-zA-Z_%*]*$/;///^[A-Za-z0-9._%*$]{6,20}$/;
+  var username_patt = /^([a-zA-Z][a-zA-Z0-9_]{2,24})$/;
+  var password_patt = /^([0-9]+[a-zA-Z_%*]+|[a-zA-Z_%*]+[0-9]+)[0-9a-zA-Z_%*]*$/;
   var errors = [];
   //var result = patt.test(str);
   
@@ -245,8 +697,8 @@ function validateSignUp(e) {
   if(username.length == 0) {
     errors.push('Username cannot be empty.');
   } else {
-    if(username.length < 6 || username.length > 25) {
-      errors.push('Username can only have 6-25 characters.');
+    if(username.length < 3 || username.length > 25) {
+      errors.push('Username can only have 3-25 characters.');
     } else if(username_patt.test(username) === false) {
       errors.push('Username must start with an alphabet and must contain numbers and alphabets. Underscore(_) is optional.');
     }
@@ -254,7 +706,7 @@ function validateSignUp(e) {
   
   //forum validation
   if(forum.length == 0 || forum === 'empty') {
-    errors.push('Choose a forum to belong to.');
+    errors.push('Choose a country to belong to.');
   }
   
   //email validation
@@ -298,28 +750,6 @@ function printError(errors, e, $errorBox) {
   e.preventDefault();
 }
 
-function hideLoginPanel() {
-  $('#sign_in_popup').removeClass('open-signin-popup');
-  $('#banner_signin').removeClass('open');
-  $('.login-icon').removeClass('fa-caret-up').addClass('fa-caret-down');
-}
-
-function showLoginPanel() {
-  $('#sign_in_popup').addClass('open-signin-popup');
-  $('#banner_signin').addClass('open');
-  $('.login-icon').removeClass('fa-caret-down').addClass('fa-caret-up');
-  $('#email_banner_login').focus();
-}
-
-function bannerLoginFormToggle (e) {
-  if($('#sign_in_popup').hasClass('open-signin-popup')) {
-    hideLoginPanel();
-  } else {
-    showLoginPanel();
-  }
-  e.preventDefault();
-}
-
 function searchbarHide() {
   //Close the search bar
   $('#searchbar_trigger').removeClass('banner-icon-active');
@@ -345,13 +775,8 @@ function searchbarToggle(e) {
     if($('#hamburger_box').hasClass('open-nav')) {
       sidebarHide();
     }
-    //If the options drop down is open and the click was outside it, close it
-    if($('#options').hasClass('open-options')) {
-      optionsHide();
-    }
   }
-  //Prevent event bubbling
-  preventBubbling(e);
+  
 }
 
 //Gets the current width of the browser
