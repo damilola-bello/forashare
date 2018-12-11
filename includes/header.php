@@ -14,17 +14,40 @@
       // Assign $err to $errors
       $errors = $err;
     } else {
-      //If log in successful, redirect to home page.
-      //header("Location: index.php");
-      //exit(); // Quit the script.
-      //echo $_SERVER['REQUEST_URI'];
-      //exit();
       $loggedin = true;
+    }
+  }
+  $font = 16;
+  $is_default_font = true;
+  if(isset($_COOKIE['font'])) {
+    $temp = $_COOKIE['font'];
+    if($temp >= 13 && $temp <= 22) {
+      $font = $temp;
+      $is_default_font = false;
+    }
+  }
+  $search_country_ID = 0;
+  if(isset($_COOKIE['searchCountryID']) && (preg_match("/^([0-9]+)$/", $_COOKIE['searchCountryID']))) {
+    //validate the cookie
+    $search_country_ID = $_COOKIE['searchCountryID'];
+    $stmt = $dbc->prepare("SELECT t.tag_id
+      FROM tag AS t
+      JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id
+      WHERE tt.name = 'forum' AND t.tag_id = ?
+    ");
+    $stmt->bind_param("i", $search_country_ID);
+    $stmt->execute();
+    $stmt->store_result();
+    if($stmt->num_rows === 1) {
+      $stmt->bind_result($search_country_ID);
+      $stmt->fetch();
+    } else {
+      $search_country_ID = 0;
     }
   }
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" <?php echo ($is_default_font == false) ? "style='font-size: $font"."px'" : ""; ?> >
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -45,6 +68,9 @@
     <!-- END OF EXTERNAL FILES -->
     <link href="css/main.css" rel="stylesheet" type="text/css">
 
+    <script type="text/javascript">
+      <?php echo "var isDefaultFont = ".($is_default_font == true ? '1' : '0').";" ?>
+    </script>
     <script src="javascript/main.js"></script>
   </head>
   <body>
@@ -68,27 +94,83 @@
               <span id="logo" class="row align-items-center"></span>
             </a>
             <div id="search_area" class="row align-items-center">
+              <div data-bind="if: pageSearchQueryLength() > 0">
+                <div data-bind=" attr: { id: 'search_result_box_outer' }">
+                  <div data-bind=" attr: { id: 'search_result_box' }">
+                    <span data-bind="if: loaded() == false">
+                      <span data-bind="html: HTMLSpinner, attr: { class: 'search-loading-box' }"></span>
+                    </span>
+                    <span data-bind="if: loaded() == true ">
+                      <ul data-bind=" foreach: searchItems, attr: { class: 'page-search-list'}">
+                        <li data-bind=" attr: { class: 'search-list-item' }">
+                          <a data-bind=" attr: { class:'search-link', href: link }">
+                            <span data-bind=" attr: { class:'search-type' }, text: `${type} :`"></span>
+                            <span data-bind="attr: { class: 'search-value' }">
+                              <span data-bind="attr: { class: 'search-value-name' }">
+                                <span data-bind=" if: image != ''">
+                                  <img data-bind="attr: { src: `${image}`, class: 'search-item-image'}">
+                                </span>
+                                <span data-bind=" attr: { class:'search-content filter-heading' }, foreach: values">
+                                  <span data-bind="text: value, css: { 'marked-text': is_marked }"></span>
+                                </span>
+                              </span>
+                              <span data-bind=" html: navArrowString()"></span>
+                            </span>
+                          </a>
+                        </li>
+                      </ul>
+                      <span data-bind="attr: { class: 'search-list-item ask-question' }">
+                        <a data-bind="attr: { class: 'search-link ask', href: 'ask.php' }">
+                          <span data-bind="text: 'Ask New Question'"></span>
+                        </a>
+                      </span>
+                      <span data-bind="if: (searchCountry() != '')">
+                        <span class="results-from-box">
+                          <span class="results-from-text">
+                            <span data-bind="text: 'Result(s) from '"></span>
+                            <a data-bind="text: `${searchCountry()}`, attr: { href: `country.php?id=${searchCountryID()}` }"></a>
+                          </span>
+                          <span>
+                            <a data-bind="event: { click: showAllCountries }" class="show-all-link" href="#">Show All</a>
+                          </span>
+                        </span>
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </div>
               <div id="page_search_box">
-                <input placeholder="Search ForaShare" class="form-control" id="page_search_input" />
+                <input placeholder="Search ForaShare" class="form-control" id="page_search_input" data-bind="value: pageSearchQuery, valueUpdate:['afterkeydown','propertychange','input']" />
               </div>
               <div id="search_region" class="row">
                 <?php
-                  $query = "SELECT t.tag_name, f.alpha_code FROM forum_details AS f JOIN tag AS t ON t.tag_id = f.tag_id JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id WHERE tt.name = 'forum' ORDER BY t.tag_name ASC";
+                  $page_search_countries = array();
+                  $query = "SELECT t.tag_name, c.alpha_code, t.tag_id FROM country_details AS c JOIN tag AS t ON t.tag_id = c.tag_id JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id WHERE tt.name = 'forum' ORDER BY t.tag_name ASC";
                   $r = mysqli_query($dbc, $query);
-
-                  //Image for the globe to search all forums
-                  $search_flag = "<img src='images/forum-32/globe.png' class='banner-search-image' data-code='globe'>";
-
-                  echo '<select class="form-control search-forum-list">';
-                  echo '<option value="globe">All</option>';
+                  $page_search_countries = array(
+                    array(
+                    'tag_name' => "All",
+                    'image_name' => "globe",
+                    'tag_id' => 0,
+                    'alpha_code' => ''
+                    )
+                  );
+                  $search_flag = "<img src='images/forum-32/globe.png' class='banner-search-image ".($search_country_ID == 0 ? 'current-country' : '') ."' data-code='globe' data-id='0'>\r\n";
                   while ($row = mysqli_fetch_array($r, MYSQLI_ASSOC)) {
                     $alpha_code = $row['alpha_code'];
-                    echo "<option value='$alpha_code'>" . strtoupper($alpha_code) . " - " . $row['tag_name'] . "</option>"; 
-                    $search_flag .= "<img src='images/forum-32/$alpha_code.png' class='banner-search-image' data-code='$alpha_code'>";
+                    $page_search_country = array(
+                      'tag_name' => $row['tag_name'],
+                      'tag_id' => $row['tag_id'],
+                      'alpha_code' => $alpha_code
+                    );
+                    array_push($page_search_countries, $page_search_country);
+
+                    $search_flag .= "<img src='images/forum-32/$alpha_code.png' class='banner-search-image ".($search_country_ID == $row['tag_id'] ? 'current-country' : '') ."' data-code='$alpha_code' data-id=".$row['tag_id'].">\r\n";
                   }
-                  echo '</select>';
-                  echo $search_flag;
+                  
                 ?>
+                <select data-bind="options: countries, optionsText: function(item){ return `${item.tag_name != 'All' ? item.alpha_code + ' - ' : '' }` + item.tag_name}, optionsValue: 'tag_id', value: search_country_ID, event: {change: changeSearchCountryName, click: setClickValue }, attr: { class: 'form-control search-forum-list'}"></select>
+                <?php echo "$search_flag"; ?>
               </div>
             </div>
             <span id="searchbar_trigger" class="banner-icon" data-toggle="tooltip" data-placement="bottom" data-original-title="Open Search" title="Open Search">
@@ -159,9 +241,6 @@
                 <li id="notification" class="banner-icon" data-toggle="tooltip" data-placement="bottom" title="Notifications">
                   <i class="fas fa-bell ico"></i>
                 </li>
-                <li id="follow_activity" class="banner-icon" data-toggle="tooltip" data-placement="bottom" title="New followers">
-                  <i class="fas fa-user-plus ico"></i>
-                </li>
                 <li id="profile" class="banner-icon">
                   <a href="user.php?id=<?php echo $_SESSION['user_id']; ?>" class="banner-profile-pic-link" title="Go to your Profile Page">
                   <!-- Set the profile icon -->
@@ -175,7 +254,7 @@
                       if($result->num_rows === 1) {
                         $row = $result->fetch_assoc();
                         $image = ($row['profile_image'] == null) ? 'images/user_icon.png': 'images/'.$row['profile_image'];
-                        echo "<img class='profile-icon-pic' src = '$image' />";
+                        echo "<img class='profile-icon-pic' id='profileIconPic' src = '$image' />";
                       } 
                       //Close the statement
                       $stmt->close();
@@ -200,14 +279,11 @@
                     <a href="user.php?id=<?php echo $_SESSION['user_id']; ?>" class="more-options-link">Profile</a>
                   </li>
                   <li class="dropdown-item">
-                    <a href="#" class="more-options-link">Posts</a>
+                    <a href="saved.php" class="more-options-link">Saved Questions</a>
                   </li>
                   <li class="dropdown-divider"></li>
                   <li class="dropdown-item">
                     <a href="#" class="more-options-link">Activity Log</a>
-                  </li>
-                  <li class="dropdown-item">
-                    <a href="#" class="more-options-link">Followers</a>
                   </li>
                   <li class="dropdown-item">
                     <a href="#" class="more-options-link">Notifications</a>
@@ -231,7 +307,7 @@
     <!-- PAGE HEADER END -->
     <div class="fontsize-adjust row">
       <div class="fontsize-toggler row" title="Adjust Font Size">
-        <span>A</span>
+        <span class="fontsize-toggler-icon">A</span>
       </div>
       <div class="fontsize-tray">
         <div class="row fontsize-heading">
@@ -240,7 +316,143 @@
         <div class="row reset-font-box">
           <a href="#" class="reset-font" onclick="return resetFont(this);">reset</a>
         </div>
-        <span class="fontsize-text row">Aa</span>
-        <input class="fontsize-range" id="fontSizeRange" onchange="changeFontSize(this)" type="range" min="10" max="19" value="16">
+        <span class="font-indicator-box">
+          <span class="fontsize-text row">Aa</span>
+          <span class="font-percentage"><?php echo ((10 - (22 - $font)) * 10)."%"; ?></span>
+        </span>
+        <script type="text/javascript">
+          <?php echo "var fontSize = $font ;"; ?>
+          <?php
+            $a = array(
+              'search_country_ID' => $search_country_ID,
+              'countries' => $page_search_countries
+            );
+            echo "var json_search_countries_payload = " . json_encode($a) . ";";
+            unset($a);
+          ?>
+
+          function navArrowString() {
+            return "<i class='fas fa-arrow-right search-item-go-icon'></i>";
+          }
+
+          function SearchItemModel(data) {
+            var self = this;
+
+            self.type = data.type;
+            self.link = data.id;
+            self.values = data.values;
+            self.image = data.image;
+          }
+
+          function SearchModel() {
+            var self = this;
+
+            self.HTMLSpinner ="<i class='fas fa-spinner loading-icon'></i>";
+            self.searchTextTimeOut = ko.observable(0);
+            self.searchDDLTimeOut = ko.observable(0);
+            self.countries = json_search_countries_payload.countries;
+            self.search_country_ID = json_search_countries_payload.search_country_ID;
+            self.selectedCountryID = ko.observable(self.search_country_ID);
+            self.pageSearchQuery = ko.observable('');
+            self.loaded = ko.observable(false);
+            self.pageSearchQueryLength = ko.computed(
+              function () {
+                return self.pageSearchQuery().trim().length;
+              }
+            );
+            self.previousSearch = ko.observable('');
+            self.searchParam = ko.observable({});
+            self.countryIDParam = ko.observable((self.selectedCountryID() == 0) ? {} : { country_id: self.selectedCountryID() });
+            self.pageSearch = ko.computed(function () {
+              let q = self.pageSearchQuery().trim();
+              let currentLength = self.pageSearchQueryLength();
+              //if the filter string changes
+              if(currentLength > 0 && self.previousSearch() != q) {
+                //clear the timeout
+                clearTimeout(self.searchTextTimeOut());
+                self.searchTextTimeOut(setTimeout(() => {
+                  self.search();
+                }, 500));
+
+                self.searchParam({q: q});
+                //set the new search param
+                self.previousSearch(q);
+              }
+            });
+            self.setClickValue = function () {
+              clickEl = 'search_select_country';
+            }
+
+            self.changeSearchCountryName = function(koObj, e) {
+              clearTimeout(self.searchDDLTimeOut());
+              let selectedID = Number(e.currentTarget.value);
+              if(!isNaN(selectedID) && selectedID >= 0 ) {
+                //reset timer
+                self.selectedCountryID(selectedID);
+
+                $(".banner-search-image").removeClass('current-country');
+                $(`.banner-search-image[data-id="${selectedID}"]`).addClass('current-country');
+
+                //set the country param
+                let param = (selectedID == 0) ? {} : { country_id: selectedID };
+                self.countryIDParam(param);
+
+                //set the search country id as a cookie, if id is 0 remove cookie
+                if(selectedID == 0) {
+                  removeCookie('searchCountryID');
+                } else {
+                  setCookie('searchCountryID', selectedID, 30);
+                }
+
+                //call search only if there is a search query
+                if(self.searchParam().q && self.searchParam().q.length > 0) {
+                  self.searchDDLTimeOut(setTimeout(() => {
+                    self.search();
+                  }, 500));
+                }
+              }
+            }
+            self.searchItems = ko.observable([]);
+            self.searchItemsCount = ko.observable(0);
+            self.searchCountry = ko.observable("");
+            self.searchCountryID = ko.observable("");
+            self.showAllCountries = function(koObj, e) {
+              //change the search country
+              $('.search-forum-list').val('0').change();
+              clickEl = 'page_search_input';
+            };
+            self.search = function() {
+              self.loaded(false);
+              let payload = { ...self.searchParam(), ...self.countryIDParam() };
+              $.get('page_search.php', payload, 
+                function(data, status) {
+                  if(status == "success") {
+                    if(data.isErr == false) {
+                      let mappedSearchItems = data.message.results.map(searchItem => new SearchItemModel(searchItem));
+                      self.searchItems(mappedSearchItems);
+                      self.searchCountry(data.message.country);
+                      self.searchCountryID(data.message.country_id);
+                      //reset the count of the search items
+                      self.searchItemsCount(self.searchItems().length);
+                      //set the focus to the input box
+                      $('#page_search_input').focus();
+
+                      self.loaded(true);
+                    } else {
+                      self.loaded(true);
+                    }
+                  } 
+              }, "json");
+            }
+          }
+
+          var searchModel = new SearchModel();
+          ko.applyBindings(searchModel, document.getElementById("top_bar"));
+        </script>
+        <span class="fontsize-change-box">
+          <i class="far fa-minus-square change-font font-subtract <?php if($font == 13) echo 'disabled'; ?>" title="Decrease Font" data-font="subtract"></i>
+          <i class="far fa-plus-square change-font font-add <?php if($font == 22) echo 'disabled'; ?>" title="Increase Font" data-font="add"></i>
+        </span>
+
       </div>
     </div>

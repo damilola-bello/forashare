@@ -1,7 +1,13 @@
 <?php
 	include('includes/generic_includes.php');
+
+  //if the user is not logged in, redirect to questions page
+  if($loggedin == false) {
+    header("Location: questions.php");
+    exit(); // Quit the script.
+  }
 	
-  $page_title = 'Questions &ndash; ForaShare';
+  $page_title = 'Saved Questions &ndash; ForaShare';
   $page = QUESTION;
   include('includes/header.php');
 ?>
@@ -22,15 +28,12 @@
 
             <a class="dropdown-toggle filter-dropdown-toggle" href="#" id="questionTagLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>tags</span>&nbsp;&nbsp;<i class="fas fa-tags"></i></a>
 
-            <ul class="dropdown-menu menu-filter dropdown-menu-right checkbox-dropdown tags-dropdown" aria-labelledby="questionTagLink" data-bind=" foreach: tags">
+            <ul class="dropdown-menu menu-filter dropdown-menu-right checkbox-dropdown" aria-labelledby="questionTagLink" data-bind=" foreach: tags">
               <?php
                 //Select the default tags
                 $query = "SELECT tag_id, tag_name FROM tag AS t JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id WHERE tt.name = 'default_tag' ORDER BY t.tag_name ASC";
                 $r = mysqli_query($dbc, $query);
-                $tags = array(
-                  array('tag_name' => "Check/Uncheck All",
-                  'tag_id' => -1)
-                );
+                $tags = array();
                 while ($row = mysqli_fetch_array($r, MYSQLI_ASSOC)) {
                   $tag_name = strtolower($row['tag_name']);
                   $tag_id = $row['tag_id'];
@@ -41,7 +44,7 @@
                   array_push($tags, $tag);
                 }
               ?>
-              <li class='dropdown-item' data-tag='$tag_name' data-tag-check='1' data-bind="event: {click: $parent.toggleTagsCheck}, css: { 'check-all': (tag_id == -1) }">
+              <li class='dropdown-item' data-tag='$tag_name' data-tag-check='1' data-bind="event: {click: $parent.toggleTagsCheck}">
                 <span class='ask-question-tag-name' tabindex='-1'>
                   <input type='checkbox' data-bind="attr: { value: tag_id}" checked="checked">
                   &nbsp;
@@ -60,7 +63,7 @@
       <!-- Question filter header -->
       <div id="question_filter_header" class="filter-header">
         <h1 class="page-title filter-page-title">
-          <span data-bind="text: 'Questions'"></span>
+          <span>Saved Questions</span>
           <span data-bind="text: totalQuestions, attr: {class: 'filter-header-count'}"></span>
         </h1>
 
@@ -74,7 +77,6 @@
               <li class="dropdown-item" data-bind="css: {active: sortType() == 'newest'}, event: { click: (sortType() != 'newest') ? sortQuestions.bind($data, 'newest') : null }">newest</li>
               <li class="dropdown-item" data-bind="css: {active: sortType() == 'oldest'}, event: { click: (sortType() != 'oldest') ? sortQuestions.bind($data, 'oldest') : null }">oldest</li>
               <li class="dropdown-item" data-bind="css: {active: sortType() == 'point'}, event: { click: (sortType() != 'point') ? sortQuestions.bind($data, 'point') : null }">point</li>
-              <li class="dropdown-item" data-bind="css: {active: sortType() == 'unanswered'}, event: { click: (sortType() != 'unanswered') ? sortQuestions.bind($data, 'unanswered') : null }">unanswered</li>
             </ul>
           </div>
         </div>
@@ -89,7 +91,7 @@
               <div data-bind="attr: {class: 'question-preview-header'}">
                 <span data-bind="attr: {class: `question-score ${(question_score > 0) ? 'positive' : ''}`}, text: question_score"></span>
                 <span>
-                  <a data-bind="attr: {class: 'question-heading-text filter-heading', href: `question.php?id=${question_id}`}, foreach: question_heading">
+                  <a data-bind="attr: {class: 'question-heading-text filter-heading', href: `question.php?id=${question_id}` }, foreach: question_heading">
                     <span class="heading-parts" data-bind="text: value, css: { 'marked-text': is_marked }"></span>
                   </a>
                   <span class="preview-question-tags-box" data-bind=" foreach: tags ">
@@ -103,6 +105,9 @@
                   <span data-bind="text: 'Answers'"></span>
                 </span>
                 <span data-bind="attr: {class: 'question-preview-date'}, text: how_long"></span>
+              </div>
+              <div>
+                <span data-bind="attr: {class: 'italic preview-saved-date'}, text: 'saved '+question_saved_when"></span>
               </div>
             </div>
           </div>
@@ -136,14 +141,13 @@
 
         self.answers = data.answers;
         self.how_long = data.how_long;
-        self.filter = filter;
         self.question_heading = data.question_heading;
         self.question_id = data.question_id;
         self.question_score = data.question_score;
+        self.question_saved_when = data.question_saved_when;
         self.tags = data.tags;
+        self.filter = filter;
       }
-
-
 
       function AppViewModel() {
         var self = this;
@@ -153,15 +157,8 @@
         self.questions = ko.observableArray([]);
         self.questionsLoading = ko.observable(false);
         self.totalQuestions = ko.observable(0);
-        self.sortType = ko.observable('newest');
-        self.allTags = new Set(
-          json_payload.tags.filter(tag => (tag.tag_id != -1))
-          .map(tag => tag.tag_id)
-        );
-        self.allTagsLength = self.allTags.size;
-        self.sortTags = ko.observable(new Set(
-          json_payload.tags.filter(tag => (tag.tag_id != -1))
-          .map(tag => tag.tag_id)));
+        self.sortType = ko.observable('point');
+        self.sortTags = ko.observable(new Set(json_payload.tags.map(tag => tag.tag_id)));
         self.loadedQuestionsCount = ko.computed(function(){
           return self.questions().length;
         });
@@ -191,8 +188,8 @@
           }
         });
         self.toggleTagsCheck = function(koObj, event) {
-          let tagID = koObj.tag_id;
-          let all = (tagID == -1) ? true : false;
+          let tagName = koObj.tag_id.toLowerCase();
+
           let $target = $( event.currentTarget ),
              val = $target.attr('data-tag'),
              checked = $target.attr('data-tag-check'),
@@ -202,44 +199,16 @@
           if (checked === '0') {
             setTimeout( function() {
               //check checkbox
-              if(all) {
-                $('.tags-dropdown input').each(function(){
-                  this.checked = true;
-                });
-                $('.tags-dropdown .dropdown-item').each(function(){
-                  $(this).attr( 'data-tag-check', '1' );
-                });
-                self.sortTags(self.allTags);
-              } else {
-                $inp[0].checked = true;
-                $target.attr( 'data-tag-check', '1' ); 
-                self.sortTags().add(tagID);
-
-                if(self.sortTags().size == self.allTagsLength) {
-                  $('.tags-dropdown .check-all').attr( 'data-tag-check', '1');
-                  $('.tags-dropdown .check-all input')[0].checked = true;
-                }
-              }
+              $inp[0].checked = true;
+              $target.attr( 'data-tag-check', '1' ); 
+              self.sortTags().add(tagName);
             }, 0);
           } else if (checked === '1') {
             setTimeout( function() { 
               //uncheck checkbox
-              if(all) {
-                $('.tags-dropdown input').each(function(){
-                  this.checked = false;
-                });
-                $('.tags-dropdown .dropdown-item').each(function(){
-                  $(this).attr( 'data-tag-check', '0' );
-                });
-                self.sortTags(new Set());
-              } else {
-                $inp[0].checked = false;
-                $target.attr( 'data-tag-check', '0' ); 
-                self.sortTags().delete(tagID);
-
-                $('.tags-dropdown .check-all').attr( 'data-tag-check', '0');
-                $('.tags-dropdown .check-all input')[0].checked = false;
-              }
+              $inp[0].checked = false;
+              $target.attr( 'data-tag-check', '0' ); 
+              self.sortTags().delete(tagName);
             }, 0);
           }
 
@@ -251,20 +220,18 @@
         }
         self.sortParam = ko.observable({});
         self.sortQuestions = function(type) {
-          let types = ['answer', 'newest', 'oldest', 'point', 'unanswered'];
+          let types = ['answer', 'newest', 'oldest', 'point'];
           // if the sort type is valid
           if(types.indexOf(type) != -1) {
             let param = {};
             if(type == 'answer'){
               self.sortParam({answer: 'desc'});
             } else if(type == 'newest') {
-              self.sortParam({});
+              self.sortParam({date: 'desc'});
             } else if(type == 'oldest') {
               self.sortParam({date: 'asc'});
             } else if(type == 'point') {
-              self.sortParam({point: 'desc'});
-            } else if(type == 'unanswered') {
-              self.sortParam({unanswered: 1});
+              self.sortParam({});
             }
 
             self.sortType(type);
@@ -305,8 +272,10 @@
           }
 
           var payload = { start: start, ...self.sortParam(), ...self.searchParam(), tags: tagParam };
-          $.get('get_questions.php', payload, 
+          console.log(payload);
+          $.get('get_saved_questions.php', payload, 
             function(data, status) {
+              console.log(data);
               if(status == "success") {
                 if(data.isErr == false) {
                   self.createQuestionModel(data.message.questions, reset);

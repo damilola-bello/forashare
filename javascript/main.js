@@ -4,6 +4,8 @@ const SIDEBAR_TOGGLE_WIDTH = 650; //This width and below the sidebar is shrunk
 const EMAIL_PATT = /^[A-Za-z0-9._%-]{1,64}@[A-Za-z0-9.-]+\.[A-Za-z]{2,6}$/;
 var searchActive = false;
 var clickEl = '';
+var searchResultsShown = false;
+var defaultFont = 16;
 
 $(document).ready(function() {
   /* EVENTS */
@@ -21,6 +23,9 @@ $(document).ready(function() {
   
   //fontsize-toggler 
   $('.fontsize-toggler').on('click', toggleAdjustFontsize);
+
+  //topic checker for ask queskion page
+  $('.ask-topic-check .dropdown-item').on('click', toggleTopicsCheck);
   
   //track progress
   $('.progressable-input').on('keyup', updateProgress);
@@ -33,110 +38,132 @@ $(document).ready(function() {
   
   $('.info-content-toggle').on('click', showHelp);
   $('.info-subcontent-title').on('click', showHelpSubcontent);
+
+  $('.change-font').on('click', changeFontSize);
   
   //Prevent click on login/sign up when active
   $('.reg-tab-active').on('click', function(e) {
     e.preventDefault();
   });
   
-  $('.post-attributes .post-action').on('click', postActionClick);
-  
   //toggle zoom image
-  $('.post .post-image').on('click', toggleImageZoom);
+  $('.question .question-image').on('click', toggleImageZoom);
   
   $('body').on('click', bodyClick);
+
   
-  $('.checkbox-dropdown-box .dropdown-item').on( 'click', toggleTagsDDL);
-  
-  $(window).resize(windowResize);  
+  $(window).resize(windowResize);
+  $('#page_search_input').on('click', function () {
+    clickEl = 'page_search_input';
+  });
   $('#page_search_input').focusin(function(){
     $('.search-forum-list').addClass('focus');
-    
+    $('#search_result_box_outer').show(function () {
+      searchResultsShown = true;
+    });
     searchActive = true;
     
     //blur the rest of the page when the search input is in focus
-    $('.search-page-blur').fadeIn();
+    $('.search-page-blur').fadeIn(function(){
+      togglePageScroll(false);
+    });
     
     clickEl = 'page_search_input';
   });
   $('#page_search_input').focusout(function(){
-    $('.search-forum-list').removeClass('focus');
+    if(clickEl != 'search_select_country') {
+      $('.search-forum-list').removeClass('focus');
+      //$('#search_result_box_outer').fadeOut();
+    }
   });
-  //When the search forum changes
-  $('.search-forum-list').on('change', changeSearchFlag);
-  
-  //Set the search flag on load
-  changeSearchFlag();
   
   //Get the width of the browser on load and set lastWidth
   lastWidth = getWindowWidth();
-
-  //check if font-size cookie exist, if so, update the font size of the page
-  var font = getCookie('font');
-  if(font.length > 0) {
-    slideFontSlider(document.getElementById('fontSizeRange'), font);
-  }
+  defaultFont = (lastWidth <= SEARCH_BAR_THRESHOLD ? 14 : 16);
+  resetFontValues();
+  
 });
 
+function togglePageScroll(scrollable) {
+  let scrollValue = (scrollable) ? 'auto' : 'hidden';
+  $('body').css('overflow-y', scrollValue);
+}
+
+//This function handles any click that occurs on the page
+function bodyClick(e) {
+  //if the search was clicked
+  if(clickEl == 'page_search_input' || clickEl == 'search_select_country') {
+    clickEl = '';
+    return;
+  }
+  $('#search_result_box_outer').fadeOut(function () {
+    searchResultsShown = false;
+  });
+  
+  var $target = $(e.target);
+  //if search is active
+  if(searchActive === true) {
+    //if the click was outside the search area, hide the page blur
+    if($target.closest('#search_area').length <= 0) {
+      $('.search-page-blur').fadeOut(function(){
+        togglePageScroll(true);
+      });
+      //set the search to inactive
+      searchActive = false;
+    }
+  }
+  //if the hamburger box was clicked
+  if(clickEl == 'hamburger_box') {
+    clickEl = '';
+    return;
+  }
+  //If the hamburger nav is open and the click was outside it, close it
+  if($('#hamburger_box').hasClass('open-nav')) {
+    sidebarHide();
+  }
+}
+
+function toggleTopicsCheck(event) {
+
+  let $target = $( event.currentTarget ),
+     val = $target.attr('data-tag'),
+     checked = $target.attr('data-tag-check'),
+     $inp = $target.find('input'),
+     idx;
+
+  if (checked === '0') {
+    setTimeout( function() {
+      //check checkbox
+      $inp[0].checked = true;
+      $target.attr( 'data-tag-check', '1' ); 
+    }, 0);
+  } else if (checked === '1') {
+    setTimeout( function() { 
+      //uncheck checkbox
+      $inp[0].checked = false;
+      $target.attr( 'data-tag-check', '0' ); 
+    }, 0);
+  }
+
+  var toggleBox = $target.closest('.form-group').find('.dropdown-toggle');
+  //if the togglebox has err class and it belongs to askQuestionTagLink, reset it
+  if(toggleBox.attr('id') == 'askQuestionTagLink' && toggleBox.hasClass('err')) {
+    toggleBox.removeClass('err');
+    toggleBox.closest('.form-group').find('.error-lbl').empty();
+  }
+  
+  $( event.target ).blur();
+      
+  return false;
+}
+
 function toggleEligibilityInfo(input) {
-  $info = $(input).closest('.post-eligibility-info-box').find('.eligibility-info').toggleClass('hide');
+  $info = $(input).closest('.question-eligibility-info-box').find('.eligibility-info').toggleClass('hide');
   if($info.hasClass('hide')) {
     $(input).attr('title', 'Show Info');
   } else {
     $(input).attr('title', 'Hide Info');
   }
-}
-
-function commentActionClick(koObject, e) {
-  postActionClick(e);
-}
-
-var $lastPostActionEl = '';
-function postActionClick(e) {
-  var $target = $(e.currentTarget);
-  var loggedin = (getCookie('in').length == 0) ? false : true;
-  
-  
-  if(loggedin == false) {
-    var open = '<div class="login-popover"><p class="login-popover-header">';
-    var open_sm = '<div class="login-popover sm"><p class="login-popover-header">';
-    var end = '</p><span class="login-popover-body"><span class="popover-msg">To make your opinion count you need to sign in.</span><span class="popover-login-prompt"><a title="Go to Sign in page" href="login.php">SIGN IN</a></span></span></div>';
-    if($lastPostActionEl != '' && $lastPostActionEl[0] != $target[0]) {
-      $('[rel=popover]').popover('hide');
-    }
-    $('body').popover('dispose');
-    $('body').popover({
-      selector: '[rel=popover]',
-      trigger: 'click',
-      content : function(){
-        var popoverContent = '';
-        var popoverType = $target.attr('data-action-type');
-        switch (popoverType) {
-          case 'post-like': 
-            popoverContent = open+"Like this Post?"+end;
-            break;
-          case 'post-dislike': 
-            popoverContent = open+"Don't like this Post?"+end;
-            break;
-          case 'post-save': 
-            popoverContent = open+"Need to save this Post?"+end;
-            break;
-          case 'comment-like': 
-            popoverContent = open_sm+"Like this Comment?"+end;
-            break;
-          case 'comment-dislike': 
-            popoverContent = open_sm+"Don't like this Comment?"+end;
-            break;
-        }
-        return popoverContent;
-      },
-      placement: "bottom",
-      html: true
-    });
-  }
-  
-  //store the last element
-  $lastPostActionEl = $target;
 }
 
 function toggleImageZoom(e) {
@@ -208,38 +235,54 @@ function setCookie(cname,cvalue,exdays) {
   document.cookie = `${cname}=${cvalue}; ${expires}; path=/`;
 }
 
-function getCookie(cname) {
-  var name = cname + "=";
-  var decodedCookie = decodeURIComponent(document.cookie);
-  var ca = decodedCookie.split(';');
-  for(var i = 0; i < ca.length; i++) {
-      var c = ca[i];
-      while (c.charAt(0) == ' ') {
-          c = c.substring(1);
-      }
-      if (c.indexOf(name) == 0) {
-          return c.substring(name.length, c.length);
-      }
-  }
-  return "";
-}
-
 function removeCookie(cname) {
   document.cookie = `${cname}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
 }
 
-function slideFontSlider(input, size) {
-  $(input).val(size);
-  changeFontSize(input);
-}
-
 function changeFontSize (input) {
+  let $inputEl = $(input.currentTarget);
+
+  if($inputEl.hasClass('disabled')) {
+    return;
+  }
   //get the font-size
-  var fontsize = $(input).val();
-  $(":root").css('font-size', `${fontsize}px`);
+  let type = $inputEl.attr('data-font');
+
+  if(type == "add") {
+    fontSize = (fontSize < 22) ? ++fontSize : fontSize;
+    if(fontSize >= 22) {
+      $inputEl.addClass('disabled');
+    } else {
+      $('.font-subtract').removeClass('disabled');
+    }
+  } else if(type == "subtract") {
+    fontSize = (fontSize > 13) ? --fontSize : fontSize;
+    if(fontSize <= 13) {
+      $inputEl.addClass('disabled');
+    } else {
+      $('.font-add').removeClass('disabled');
+    }
+  }
+
+  isDefaultFont = 0;
+  setFontPercentage(fontSize, isDefaultFont);
+
+
+  $(":root").css('font-size', `${fontSize}px`);
 
   //set the cookie to the new font size
-  setCookie('font', fontsize, 30);
+  setCookie('font', fontSize, 30);
+}
+
+function setFontPercentage (font, defaultFontUsed) {
+  let str = '';
+  if (!defaultFontUsed) {
+    str = `${100 + ((font - defaultFont) * 10)}%`;
+  } else {
+    str = "100%";
+  }
+  fontSize = font;
+  $('body .font-percentage').text(`${str}`);
 }
 
 function toggleAdjustFontsize(e){
@@ -258,9 +301,17 @@ function resetFont(input) {
   $(":root").css('font-size', '');
   //get the default font-size
   var size = parseInt($(":root").css('font-size'));
-  //get the font-range and update it to the default font-size
-  $(input).closest('.fontsize-tray').find('.fontsize-range').val(size);
+
+  isDefaultFont = 1;
+
+  setFontPercentage(size, isDefaultFont);
+
+  //set the font size
+  fontSize = size;
+
+  $('.change-font').removeClass('disabled')
   
+
   //remove the font cookie
   removeCookie('font');
   
@@ -436,7 +487,7 @@ function askQuestionSubmit() {
   
   //forum validation
   if(forum == "empty") {
-    $('.question-forum-err').text("Select a country to post to.");
+    $('.question-forum-err').text("Select a country to question to.");
     $(forumEl).addClass('err');
     //add event so when the input changes, the error disappers
     $(forumEl).on('change', removeError);
@@ -474,7 +525,7 @@ function askQuestionSubmit() {
     formData.append('image1', image1);
     formData.append('image2', image2);
     $.ajax({
-      url: "make_post.php",
+      url: "make_question.php",
       data: formData,
       processData: false,
       contentType: false,
@@ -486,7 +537,7 @@ function askQuestionSubmit() {
         if(dataObj.isErr === true) {
           //displayError(msg, $errorBox);         
         } else if(dataObj.isErr === false) {
-          window.location.replace( `${window.location.protocol}//${window.location.host}/forashare/question.php?id=${msg}` );
+          window.location.replace( `${window.location.protocol}//${window.location.host}/${window.location.hostname == "localhost" ? 'forashare' : ''}/question.php?id=${msg}` );
         }
         $('.ask-question-loading').addClass('hide');
       },
@@ -525,38 +576,6 @@ function removeError(e, detach = true) {
   }
 }
 
-function toggleTagsDDL(event) {
-  var $target = $( event.currentTarget ),
-     val = $target.attr('data-tag'),
-     checked = $target.attr('data-tag-check'),
-     $inp = $target.find('input'),
-     idx;
-
-  if (checked === '0') {
-    setTimeout( function() {
-      //check checkbox
-      $inp[0].checked = true;
-      $target.attr( 'data-tag-check', '1' ); 
-    }, 0);
-  } else if (checked === '1') {
-    setTimeout( function() { 
-      //uncheck checkbox
-      $inp[0].checked = false;
-      $target.attr( 'data-tag-check', '0' ); 
-    }, 0);
-  }
-
-  var toggleBox = $target.closest('.form-group').find('.dropdown-toggle');
-  //if the togglebox has err class and it belongs to askQuestionTagLink, reset it
-  if(toggleBox.attr('id') == 'askQuestionTagLink' && toggleBox.hasClass('err')) {
-    toggleBox.removeClass('err');
-    toggleBox.closest('.form-group').find('.error-lbl').empty();
-  }
-  
-   $( event.target ).blur();
-      
-  return false;
-}
 
 function preventBubbling(e) {
   //function to prevent event bubbling
@@ -604,42 +623,6 @@ function togglePassword(e) {
     $form.find('.password-input').attr('type', 'password');
     //Change the eye icon
     $target.toggleClass('fa-eye-slash fa-eye').attr('title', 'Show Password');
-  }
-}
-
-function changeSearchFlag() {
-  //Get the value of the selected forum
-  var forumAlphaCode = $(".search-forum-list option:selected").val();
-  $(".banner-search-image").removeClass('current-forum');
-  $(`*[data-code="${forumAlphaCode}"]`).addClass('current-forum');
-}
-
-//This function handles any click that occurs on the page
-function bodyClick(e) {
-  //if the search was clicked
-  if(clickEl == 'page_search_input') {
-    clickEl = '';
-    return;
-  }
-  
-  var $target = $(e.target);
-  //if search is active
-  if(searchActive === true) {
-    //if the click was outside the search area, hide the page blur
-    if($target.closest('#search_area').length <= 0) {
-      $('.search-page-blur').fadeOut();
-      //set the search to inactive
-      searchActive = false;
-    }
-  }
-  //if the hamburger box was clicked
-  if(clickEl == 'hamburger_box') {
-    clickEl = '';
-    return;
-  }
-  //If the hamburger nav is open and the click was outside it, close it
-  if($('#hamburger_box').hasClass('open-nav')) {
-    sidebarHide();
   }
 }
 
@@ -755,7 +738,12 @@ function searchbarHide() {
   $('#searchbar_trigger').removeClass('banner-icon-active');
   $('#searchbar_trigger').attr('data-original-title', 'Open Search');
   $('#search_area').fadeOut();
-  $('.search-page-blur').fadeOut();
+  $('.search-page-blur').fadeOut(function(){
+    togglePageScroll(true);
+  });
+  $('#search_result_box_outer').fadeOut(function () {
+    searchResultsShown = false;
+  });
   //set the search to inactive
   searchActive = false;
 }
@@ -785,6 +773,7 @@ function getWindowWidth() {
 }
 function windowResize() {
   var currentWidth = getWindowWidth();
+  defaultFont = (currentWidth <= SEARCH_BAR_THRESHOLD ? 14 : 16);
   
   var changeWidth = false;
   //If the last width had the sidebar hidden, unhide it
@@ -792,19 +781,36 @@ function windowResize() {
     $('.sidebar').removeAttr("style");
     $('#hamburger_box').removeClass('open-nav');
     changeWidth = true;
-  }
+  } 
+  //console.log("---", lastWidth, SEARCH_BAR_THRESHOLD, currentWidth);
   if(lastWidth < SEARCH_BAR_THRESHOLD && currentWidth >= SEARCH_BAR_THRESHOLD) {
     $('#search_area').removeAttr("style");
     $('#searchbar_trigger').removeClass('banner-icon-active');
     
     $('#searchbar_trigger').attr('data-original-title', 'Open Search');
-    
+
+    resetFontValues();
+
     changeWidth = true;
-  } else if(currentWidth < SEARCH_BAR_THRESHOLD) {
+  } else if(currentWidth <= SEARCH_BAR_THRESHOLD) {
+    if(lastWidth >= SEARCH_BAR_THRESHOLD && searchResultsShown == true) {
+      $('#searchbar_trigger').click();
+    }
+    resetFontValues();
     changeWidth = true;
   }
   
   if(changeWidth) {
     lastWidth = currentWidth;
+  }
+}
+
+function resetFontValues() {
+  if(!isDefaultFont) {
+    setFontPercentage(fontSize, isDefaultFont);
+  } else {
+    let tempFont = parseInt($(":root").css('font-size'));
+    let currentFont = (tempFont != defaultFont) ? tempFont : defaultFont;
+    setFontPercentage(currentFont, isDefaultFont);
   }
 }

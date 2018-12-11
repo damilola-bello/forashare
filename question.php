@@ -1,36 +1,36 @@
 <?php
   /*
     needed query parameters for this page for now
-    id - id of the post
+    id - id of the question
   */
 
-	include('includes/generic_includes.php');
+	require_once('includes/generic_includes.php');
 
   $is_404 = false;
-  $page_heading = "Oops! Post not found :(";
+  $page_heading = "Oops! Question not found :(";
   //if id query parameter doesn't exist, redirect to questions page
   if(isset($_GET['id']) && !empty($_GET['id'])) {
-    $post_id = trim($_GET['id']);
+    $question_id = trim($_GET['id']);
 
     //if id is numeric and greater than 0
-    if (is_numeric($post_id) && filter_var($post_id, FILTER_VALIDATE_INT) != false && intval($post_id) > 0) {
-      $post_id = intval($post_id);
-      //check if post exists
-      $stmt = $dbc->prepare("SELECT COUNT(*) AS count, post_heading FROM post WHERE post_id = ?");
-      $stmt->bind_param("d", $post_id);
+    if (is_numeric($question_id) && filter_var($question_id, FILTER_VALIDATE_INT) != false && intval($question_id) > 0) {
+      $question_id = intval($question_id);
+      //check if question exists
+      $stmt = $dbc->prepare("SELECT COUNT(question_id) AS count, question_heading FROM question WHERE question_id = ?");
+      $stmt->bind_param("i", $question_id);
       $stmt->execute();
       $stmt->store_result();
       $stmt->bind_result($count, $heading);
       $stmt->fetch();
       $stmt->free_result();
       $stmt->close();
-      //if post does not exists
+      //if question does not exists
       if(intval($count) != 1) {
         $is_404 = true;
       } else {
         $page_heading = $heading;
 
-        $query_string = "?id=$post_id";
+        $query_string = "?id=$question_id";
       }
     } else {
       $is_404 = true;
@@ -43,12 +43,12 @@
   }
   $page_title = $page_heading . " &ndash; ForaShare";
   $page = QUESTION;
-  include('includes/header.php');
+  require('includes/header.php');
 ?>
 <!-- CONTAINER -->
-<div class="container-fluid content-container">
+<div class="container-fluid content-container" id="main_content">
   <?php
-    include('includes/sidebar.php');
+    require('includes/sidebar.php');
   ?>
   <div class="main-content">
     <div class="create-link-box row">
@@ -56,43 +56,59 @@
     </div>
     <?php
       if($is_404):
-        $page_err_msg = "Post not found.";
-        include('includes/err404.php');
+        $page_err_msg = "Question not found.";
+        require('includes/err404.php');
 
       else:
-        //variable to determine if the user can add a comment to the post
-        $eligible_to_comment = false;
-    ?>
-    <div class="post-outer-container">
+        //variable to determine if the user can add a answer to the question
+        $eligible_to_answer = false;
 
-      <!-- Post Container -->
-      <div class="post" data-post-id="<?php echo $post_id; ?>">
-        <!-- Post Header -->
-        <div class="post-header">
-          <h1 class="post-heading page-title">
+        $answer_focus_id = null;
+        $answer_focus_user_id = null;
+        //check if the page should display a particular answer
+        if (isset($_GET['answer']) && isset($_GET['uid'])) {
+          $temp_answer = $_GET['answer'];
+          $temp_user_id = $_GET['uid'];
+          if((filter_var($temp_answer, FILTER_VALIDATE_INT) === 0 || filter_var($temp_answer, FILTER_VALIDATE_INT)) && (filter_var($temp_user_id, FILTER_VALIDATE_INT) === 0 || filter_var($temp_user_id, FILTER_VALIDATE_INT))) {
+            $answer_focus_id = intval($_GET['answer']);
+            $answer_focus_user_id = intval($_GET['uid']);
+          }
+        }
+    ?>
+    <div class="question-outer-container">
+
+      <!-- Question Container -->
+      <div class="question" data-question-id="<?php echo $question_id; ?>">
+        <!-- Question Header -->
+        <div class="question-header">
+          <h1 class="question-heading page-title">
             <span><?php echo $heading; ?>
-              <span title="Score" class="post-score" data-bind="text: postScore, css: {positive: postScore() > 0 }"></span>  
+              <span title="Score" class="question-score" data-bind="text: questionScore, css: {positive: questionScore() > 0 }"></span>  
             </span>
           </h1>
-          <div class="post-tags">
-            <i class="fas fa-tag post-tag-icon"></i>
+          <div class="question-tags">
+            <i class="fas fa-tag question-tag-icon"></i>
             <?php
+              $question_tags = array();
               //load the tags sorted by the forum first, followed by default tags then custom tags 
-              $stmt = $dbc->prepare("SELECT t.tag_id, t.tag_name, tt.name FROM tag_associations AS ta JOIN tag AS t ON ta.tag_id = t.tag_id JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id WHERE ta.post_id = ? ORDER BY FIELD (tt.name, 'forum', 'default_tag', 'custom_tag')");
-              $stmt->bind_param("d", $post_id);
+              $stmt = $dbc->prepare("SELECT t.tag_id, t.tag_name, tt.name FROM tag_associations AS ta JOIN tag AS t ON ta.tag_id = t.tag_id JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id WHERE ta.question_id = ? ORDER BY FIELD (tt.name, 'forum', 'default_tag', 'custom_tag')");
+              $stmt->bind_param("d", $question_id);
               $stmt->execute();
               $stmt->store_result();
               $stmt->bind_result($temp_tag_id, $temp_tag_name, $temp_tag_type_name);
               while ($stmt->fetch()) {
+                array_push($question_tags, $temp_tag_id);
                 $css = '';
                 if($temp_tag_type_name == 'forum'){
                   $css .= 'forum-tag';
-                  //get the forum id for the post
-                  $post_forum_id = $temp_tag_id;
+                  //get the forum id for the question
+                  $question_forum_id = $temp_tag_id;
                 } else if($temp_tag_type_name == 'custom_tag') {
                   $css .= 'custom-tag';
                 }
-                echo "<a href='tag.php?id=$temp_tag_id' class='post-tag $css'>" . strtolower($temp_tag_name) . "</a>";
+                $temp_page = ($temp_tag_type_name == 'forum') ? 'country' : 'tag';
+                echo "<a href='$temp_page.php?id=$temp_tag_id' class='question-tag $css'>" . strtolower($temp_tag_name) . "</a>";
+                unset($temp_page);
               }
               $stmt->free_result();
               $stmt->close();
@@ -101,23 +117,23 @@
           </div>
         </div>
 
-        <!-- Post Body -->
-        <div class="post-box">
+        <!-- Question Body -->
+        <div class="question-box">
           <?php
-            //get post content, attributes(likes/dislikes/comments count) and user who posted it
-            $stmt = $dbc->prepare("SELECT p.post_text, p.post_date, p.likes, p.dislikes, p.comments, u.user_id, u.username, u.profile_image, t.tag_name, TIMESTAMPDIFF(SECOND, p.post_date, NOW()) AS seconds, DATE_FORMAT(p.post_date, '%M %e'), DATE_FORMAT(p.post_date, ' at %h:%i %p'), YEAR(p.post_date), YEAR(NOW()), DAY(p.post_date), DAY(NOW()) FROM post AS p JOIN user AS u ON p.user_id = u.user_id JOIN tag AS t ON u.tag_id = t.tag_id WHERE post_id = ?");
-            $stmt->bind_param("i", $post_id);
+            //get question content, attributes(likes/dislikes/answers count) and user who questioned it
+            $stmt = $dbc->prepare("SELECT q.question_text, q.question_date, q.likes, q.dislikes, q.points, q.answers, u.user_id, u.username, u.profile_image, t.tag_name, TIMESTAMPDIFF(SECOND, q.question_date, NOW()) AS seconds, DATE_FORMAT(q.question_date, '%M %e'), DATE_FORMAT(q.question_date, ' at %h:%i%p'), YEAR(q.question_date), YEAR(NOW()), DAY(q.question_date), DAY(NOW()) FROM question AS q JOIN user AS u ON q.user_id = u.user_id JOIN tag AS t ON u.tag_id = t.tag_id WHERE question_id = ?");
+            $stmt->bind_param("i", $question_id);
             $stmt->execute();
             $stmt->store_result();
-            $stmt->bind_result($post_text, $post_date, $post_likes_count, $post_dislikes_count, $post_comments_count, $post_user_id, $username, $user_img, $post_owner_forum, $seconds, $post_date_open, $post_date_close, $post_year, $current_year, $post_day, $today);
+            $stmt->bind_result($question_text, $question_date, $question_likes_count, $question_dislikes_count, $question_score, $question_answers_count, $question_user_id, $username, $user_img, $question_owner_forum, $seconds, $question_date_open, $question_date_close, $question_year, $current_year, $question_day, $today);
             $stmt->fetch();
             $stmt->free_result();
             $stmt->close();
             unset($stmt);
 
           ?>
-          <div class="post-main post-section">
-            <div class="post-user-icon-box icon-big-box">
+          <div class="question-main question-section">
+            <div class="question-user-icon-box icon-big-box">
               <?php
               //initialize the user view values
                 $view_user_id = null;
@@ -125,37 +141,37 @@
                 $view_user_username = null;
 
                 include('includes/how_long.php');
-                include('includes/post_action_title.php');
+                include('includes/question_action_title.php');
                 //print user icon
-                echo "<a href='user.php?id=$post_user_id'><img class='post-user-img' alt='$username Profile Image' src='images/". (empty(trim($user_img)) ? 'user_icon.png' : trim($user_img)) ."'/></a>";
+                echo "<a href='user.php?id=$question_user_id'><img class='question-user-img' alt='$username Profile Image' src='images/". (empty(trim($user_img)) ? 'user_icon.png' : trim($user_img)) ."'/></a>";
                 
               ?>
             </div>
-            <div class="post-main-content">
-              <ul class="post-user-details">
+            <div class="question-main-content">
+              <ul class="question-user-details">
                 <li>
                   <?php
-                    $title = ( ($loggedin == true && $_SESSION['user_id'] == $post_user_id) ? 'Go to your Profile' : $username.' is a member of '. $post_owner_forum);
-                    echo "<a title='$title' href='user.php?id=$post_user_id' class='user-name'>". ucfirst($username) ."</a>";
+                    $title = ( ($loggedin == true && $_SESSION['user_id'] == $question_user_id) ? 'Go to your Profile' : $username.' is a member of '. $question_owner_forum);
+                    echo "<a title='$title' href='user.php?id=$question_user_id' class='user-name'>". ucfirst($username) ."</a>";
                   ?>
                 </li>
                 <li class="list-divider"></li>
-                <li><span class="post-time" title="<?php echo $post_date; ?>"><?php echo calculate($seconds, $post_date_open, $post_date_close, $post_year, $current_year, $post_date, $today); ?></span></li>
+                <li><span class="question-time" title="<?php echo $question_date; ?>"><?php echo calculate($seconds, $question_date_open, $question_date_close, $question_year, $current_year, $question_date, $today); ?></span></li>
               </ul>
-              <div class="post-details">
-                <p class="post-details-text"><?php echo htmlspecialchars($post_text, ENT_QUOTES); ?></p>
+              <div class="question-details">
+                <p class="question-details-text"><?php echo htmlspecialchars($question_text, ENT_QUOTES); ?></p>
                 <?php
-                  //get the post images
-                  $stmt = $dbc->prepare("SELECT image_name FROM post_images WHERE post_id = ?");
-                  $stmt->bind_param("i", $post_id);
+                  //get the question images
+                  $stmt = $dbc->prepare("SELECT image_name FROM question_images WHERE question_id = ?");
+                  $stmt->bind_param("i", $question_id);
                   $stmt->execute();
                   $stmt->store_result();
                   if($stmt->num_rows > 0) {
-                    echo "<div class='post-image-box'>";
+                    echo "<div class='question-image-box'>";
                     $stmt->bind_result($image_name);
                     
                     while($stmt->fetch()) {
-                      echo "<img class='min post-image' title='Zoom In' src='images/question/". trim($image_name) ."' alt='Image for Post - $heading'>";
+                      echo "<img class='min question-image' title='Zoom In' src='images/question/". trim($image_name) ."' alt='Image for Question - $heading'>";
                     }
                     echo "</div>";
 
@@ -166,13 +182,13 @@
                   $stmt->close();
                 ?>
                 <?php
-                  //flags to know if the user has previously liked/disliked a post
-                  $like_post = false;
-                  $dislike_post = false;
-                  $is_post_saved = false;
+                  //flags to know if the user has previously liked/disliked a question
+                  $like_question = false;
+                  $dislike_question = false;
+                  $is_question_saved = false;
 
                 ?>
-                <ul class="post-attributes">
+                <ul class="question-attributes">
                   <?php
                   if($loggedin) {
                     
@@ -186,24 +202,24 @@
                     $stmt->fetch();
                     $stmt->free_result();
 
-                    //the user is only eligiblie if he belong to the country of post or he is the owner of the post
-                    if($user_forum_id == $post_forum_id || $view_user_id == $post_user_id) {
-                      $eligible_to_comment = true;
+                    //the user is only eligiblie if he belong to the country of question or he is the owner of the question
+                    if($user_forum_id == $question_forum_id || $view_user_id == $question_user_id) {
+                      $eligible_to_answer = true;
                     }
 
-                    //check if the view user has saved the post before
-                    $stmt = $dbc->prepare("SELECT post_id FROM saved_post WHERE post_id = ? AND user_id = ?");
-                    $stmt->bind_param("ii", $post_id, $view_user_id);
+                    //check if the view user has saved the question before
+                    $stmt = $dbc->prepare("SELECT question_id FROM saved_question WHERE question_id = ? AND user_id = ?");
+                    $stmt->bind_param("ii", $question_id, $view_user_id);
                     $stmt->execute();
                     $stmt->store_result();
                     if($stmt->num_rows == 1) {
-                      $is_post_saved = true;
+                      $is_question_saved = true;
                     }
                     $stmt->free_result();
 
-                    //check if the view user has ever liked or disliked the post
-                    $stmt = $dbc->prepare("SELECT is_like FROM post_likes WHERE post_id = ? AND user_id = ?");
-                    $stmt->bind_param("ii", $post_id, $view_user_id);
+                    //check if the view user has ever liked or disliked the question
+                    $stmt = $dbc->prepare("SELECT is_like FROM question_likes WHERE question_id = ? AND user_id = ?");
+                    $stmt->bind_param("ii", $question_id, $view_user_id);
                     $stmt->execute();
                     $stmt->store_result();
                     if($stmt->num_rows == 1) {
@@ -211,41 +227,41 @@
                       $stmt->fetch();
 
                       if($is_like == 1) {
-                        $like_post = true;
+                        $like_question = true;
                       } else if($is_like == 0) {
-                        $dislike_post = true;
+                        $dislike_question = true;
                       }
                     }
                     $stmt->free_result();
                     $stmt->close();
                   ?>
-                  <li rel="popover" data-action-type="post-like" class="post-action post-like" data-bind="css: { active: postLiked() == true, loading: postLikeLoading() }, attr: {title: postLikeTitle()}, event: { click: function() { sendLikeDislike(1) } }">
-                    <i class="far fa-thumbs-up icon" data-bind="css: {hide: postLikeLoading() }"></i>
-                    <i class="fas fa-spinner loading-icon" data-bind="css: {hide: !postLikeLoading() }"></i>
-                    <span class="react-count" data-bind="text: postLikesCount"></span>
+                  <li data-action-type="question-like" class="question-action question-like" data-bind="css: { active: questionLiked() == true, loading: questionLikeLoading() }, attr: {title: (viewUserID == questionUserID)? '' : questionLikeTitle(), 'data-content': (viewUserID == questionUserID) ? 'You cannot like your own Question' : '' }, event: { click: (viewUserID == questionUserID) ? popoverLikeDislike : sendLikeDislike.bind($data, 1) }">
+                    <i class="far fa-thumbs-up icon" data-bind="css: {hide: questionLikeLoading() }"></i>
+                    <i class="fas fa-spinner loading-icon" data-bind="css: {hide: !questionLikeLoading() }"></i>
+                    <span class="react-count" data-bind="text: questionLikesCount"></span>
                   </li>
                   <li class="list-divider"></li>
-                  <li rel="popover" data-action-type="post-dislike" class="post-action post-dislike" data-bind="css: { active: postDisliked() == true, loading: postDislikeLoading() }, attr: {title: postDislikeTitle()}, event: { click: function() { sendLikeDislike(0) } }">
-                    <i class="far fa-thumbs-down icon" data-bind="css: {hide: postDislikeLoading() }"></i>
-                    <i class="fas fa-spinner loading-icon" data-bind="css: {hide: !postDislikeLoading() }"></i>
-                    <span class="react-count" data-bind="text: postDislikesCount"></span>
+                  <li data-action-type="question-like" class="question-action question-like" data-bind="css: { active: questionDisliked() == true, loading: questionDislikeLoading() }, attr: {title: (viewUserID == questionUserID)? '' : questionDislikeTitle(), 'data-content': (viewUserID == questionUserID) ? 'You cannot dislike your own Question' : '' }, event: { click: (viewUserID == questionUserID) ? popoverLikeDislike : sendLikeDislike.bind($data, 0) }">
+                    <i class="far fa-thumbs-down icon" data-bind="css: {hide: questionDislikeLoading() }"></i>
+                    <i class="fas fa-spinner loading-icon" data-bind="css: {hide: !questionDislikeLoading() }"></i>
+                    <span class="react-count" data-bind="text: questionDislikesCount"></span>
                   </li>
                   <li class="list-divider"></li>
-                  <li rel="popover" data-action-type="post-save" class="post-action post-save" data-bind="css: {active: isPostSaved() }, event: {click: savePost}, attr: {title: (isPostSaved() ? 'Unsave this Question' : 'I like this Question')}">
+                  <li rel="popover" data-action-type="question-save" class="question-action question-save" data-bind="css: {active: isQuestionSaved() }, event: {click: saveQuestion}, attr: {title: (isQuestionSaved() ? 'Unsave this Question' : 'I like this Question')}">
                     <i class="far fa-bookmark icon"></i>
                   </li>
                 <?php
                   unset($is_like);
                   } else {
                 ?>
-                  <li class="post-action-ineligible">
-                    <span class="react-count" data-bind="text: postLikesCount"></span>
-                    <span data-bind="text: ' Like'+(postLikesCount()>1 ? 's' : '')"></span>
+                  <li class="question-action-ineligible">
+                    <span class="react-count" data-bind="text: questionLikesCount"></span>
+                    <span data-bind="text: ' Like'+(questionLikesCount()>1 ? 's' : '')"></span>
                   </li>
                   <li class="list-divider"></li>
-                  <li class="post-action-ineligible">
-                    <span class="react-count" data-bind="text: postDislikesCount"></span>
-                    <span data-bind="text: ' Dislike'+(postDislikesCount()>1 ? 's' : '')"></span>
+                  <li class="question-action-ineligible">
+                    <span class="react-count" data-bind="text: questionDislikesCount"></span>
+                    <span data-bind="text: ' Dislike'+(questionDislikesCount()>1 ? 's' : '')"></span>
                   </li>
                 <?php
                   }
@@ -254,10 +270,10 @@
 
                 <?php
 
-                  if($eligible_to_comment) {
+                  if($eligible_to_answer) {
                 ?>
-                <div class="add-comment-trigger-box">
-                  <span class="add-comment-trigger" data-bind="css: { active: commentBoxOpen() == true }, event: { click: showCommentBox }">Add answer</span>
+                <div class="add-answer-trigger-box">
+                  <span class="add-answer-trigger" data-bind="css: { active: answerBoxOpen() == true }, event: { click: showAnswerBox }">Add answer</span>
                 </div>
                 <?php
                   }
@@ -267,10 +283,10 @@
           </div>
 
           <?php
-            if($eligible_to_comment) {
+            if($eligible_to_answer) {
           ?>
-          <div class="post-add-comment add-comment post-section" data-bind="css: { hide: commentBoxOpen() == false }">
-            <div class="post-user-icon-box icon-big-box">
+          <div class="question-add-answer add-answer question-section" data-bind="css: { hide: answerBoxOpen() == false }">
+            <div class="question-user-icon-box icon-big-box">
               <?php
                 $stmt = $dbc->prepare("SELECT username, profile_image FROM user WHERE user_id = ?");
                 $stmt->bind_param("i", $view_user_id);
@@ -288,26 +304,26 @@
                 <a href="user.php?id=<?php echo $view_user_id; ?>" title="You">
                   <?php
                     $view_user_profile_image = ($view_user_profile_image == null || empty($view_user_profile_image)) ? 'user_icon.png' : trim($view_user_profile_image);
-                    echo "<img class='post-user-img' alt='$view_user_username' src='images/". $view_user_profile_image ."' />";
+                    echo "<img class='question-user-img' alt='$view_user_username' src='images/". $view_user_profile_image ."' />";
                   ?>
                 </a>
             </div>
-            <div class="add-comment-box">
-              <div class="form-group post-input-box">
-                <textarea class="form-control post-input comment-input" data-bind="value: commentInputText, valueUpdate:['afterkeydown','propertychange','input'], hasFocus: commentBoxOpen()" rows="6" placeholder="Add an answer..."></textarea>
-                <span class="post-input-count-box" data-bind="text: commentInputTextCount, css: { over: commentInputTextExceeded() }"></span>
+            <div class="add-answer-box">
+              <div class="form-group question-input-box">
+                <textarea class="form-control question-input answer-input" data-bind="value: answerInputText, valueUpdate:['afterkeydown','propertychange','input'], hasFocus: answerBoxOpen()" rows="6" placeholder="Add an answer..."></textarea>
+                <span class="question-input-count-box" data-bind="text: answerInputTextCount, css: { over: answerInputTextExceeded() }"></span>
               </div>
-              <div class="form-group post-btn-box">
-                <button class="btn clear-btn" data-bind="event: { click: hideCommentBox } ">Cancel</button>
-                <button class="btn comment-btn post-btn" data-bind="event: {click: makeComment}, css: { disabled: commentBtnDisabled() }">Answer</button>
+              <div class="form-group question-btn-box">
+                <button class="btn clear-btn" data-bind="event: { click: hideAnswerBox } ">Cancel</button>
+                <button class="btn answer-btn question-btn" data-bind="event: {click: makeAnswer}, css: { disabled: answerBtnDisabled() }">Answer</button>
               </div>
             </div>
           </div>
           <?php
-            } else if($eligible_to_comment == false && $loggedin == true) {
-               //if the user is logged in but cannot comment due to being ineligible
+            } else if($eligible_to_answer == false && $loggedin == true) {
+               //if the user is logged in but cannot answer due to being ineligible
           ?>
-              <div class="post-eligibility-info-box">
+              <div class="question-eligibility-info-box">
                 <div class="info-icon-box">
                   <div class="info-icon-box-inner" title="Show Info" onclick="toggleEligibilityInfo(this)">
                     <i class="fas fa-info-circle info-icon"></i>
@@ -322,28 +338,29 @@
             }
           ?>
 
-          <div class="post-comments">
-            <div class="post-comments-header">
+          <div class="question-answers">
+            <div class="question-answers-header">
               <span>Answers</span>
             </div>
-            <div class="comment-box">
-              <div class="loading-box hide comments-loading" title="Loading..." data-bind="css: { hide: commentsLoading() == false }">
+            <div class="answer-box">
+              <div class="loading-box hide answers-loading" title="Loading..." data-bind="css: { hide: answersLoading() == false }">
                 <i class="fas fa-spinner loading-icon"></i>
               </div>
-              <div class="no-post-comment" data-bind="if: totalComments() != null && totalComments() <= 0">
+              <div class="no-question-answer" data-bind="if: totalAnswers() != null && totalAnswers() <= 0">
                 <p>This Question has no answer yet.</p>
               </div>
 
-              <div class="comment-filter-details row">
-                <p class="comment-count-text" data-bind="if: totalComments() > 0">
-                  <span class="comment-count" data-bind="text: getTotalComments()"></span>
+              <div class="answer-filter-details row">
+                <p class="answer-count-text" data-bind="if: totalAnswers() > 0">
+                  <span class="answer-count" data-bind="text: getTotalAnswers()"></span>
                 </p>
-                <div class="comment-filter" data-bind="if: totalComments() > 1">
-                  <div class="dropdown filter-order-dropdown" id="comment_order_dropdown">
-                    <a class="dropdown-toggle filter-dropdown-toggle" href="#" id="commentSortLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">new</a>
-                    <ul class="dropdown-menu menu-filter dropdown-menu-right sort-dropdown" aria-labelledby="commentSortLink" id="comment_sort">
-                      <li class="dropdown-item active">new</li>
-                      <li class="dropdown-item">point</li>
+                <div class="answer-filter" data-bind="if: totalAnswers() > 1">
+                  <div class="dropdown filter-order-dropdown" id="answer_order_dropdown">
+                    <a class="dropdown-toggle filter-dropdown-toggle" href="#" id="answerSortLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" data-bind="text: sortAnswerType"></a>
+                    <ul class="dropdown-menu menu-filter dropdown-menu-right sort-dropdown" aria-labelledby="answerSortLink" id="answer_sort">
+                      <li class="dropdown-item" data-bind="css: { active: sortAnswerType() == 'newest' }, event: { click: (sortAnswerType() != 'newest') ? sortAnswers.bind($data, 'newest') : null }">newest</li>
+                      <li class="dropdown-item" data-bind="css: { active: sortAnswerType() == 'oldest' }, event: { click: (sortAnswerType() != 'oldest') ? sortAnswers.bind($data, 'oldest') : null }">oldest</li>
+                      <li class="dropdown-item" data-bind="css: { active: sortAnswerType() == 'score' }, event: { click: (sortAnswerType() != 'score') ? sortAnswers.bind($data, 'score') : null }">score</li>
                     </ul>
                   </div>
                 </div>
@@ -351,85 +368,85 @@
               
               
 
-              <div class="comments" data-bind=" foreach: comments">
+              <div class="answers" data-bind=" foreach: answers">
 
-                <div class="comment">
-                  <div data-bind="css: { collapsed: commentHidden() == true, owner: is_owner, focus: replyInputFocused() }" class="comment-wrap post-section">
-                    <div class="comment-user-icon-box icon-big-box" data-bind="css: { collapsed: commentHidden() == true, owner: is_owner }">
+                <div class="answer" data-bind="css: { answerFocus: ($parent.answerFocusID == id)}">
+                  <div data-bind="css: { collapsed: answerHidden() && ($parent.answerFocusID != id), owner: is_owner, focus: replyInputFocused() }" class="answer-wrap question-section">
+                    <div class="answer-user-icon-box icon-big-box" data-bind="css: { collapsed: answerHidden() == true, owner: is_owner }">
                       <a data-bind="attr: { href: 'user.php?id=' + user_id, title: user_username }"><img data-bind="attr: {src: 'images/'+user_profile_image }"/></a>
                     </div>
-                    <div class="comment-main-content">
-                      <div class="comment-controls">
-                        <ul class="comment-user-details">
+                    <div class="answer-main-content">
+                      <div class="answer-controls">
+                        <ul class="answer-user-details">
                           <li>
-                            <a data-bind="attr: { title: nameTitle(), href: 'user.php?id=' + user_id, class: 'user-name' }, html: user_username"></a>
+                            <a class="user-name" data-bind="attr: { title: nameTitle(), href: 'user.php?id=' + user_id }, css: {questionOwner: ($parent.questionUserID == user_id), focusUser: ($parent.answerFocusUserID == user_id && $parent.questionUserID != user_id)}, text: user_username"></a>
                           </li>
                           <li class="list-divider"></li>
                           <li>
-                            <span class="comment-time" data-bind="attr: { title: date }, html: how_long"></span>
+                            <span class="answer-time" data-bind="attr: { title: date }, text: how_long"></span>
                           </li>
                         </ul>
-                        <div class="post-toggler-box">
-                          <a href="#" class="post-toggler" data-bind="attr: { title: (commentHidden() == false ? 'collapse' : 'expand')}, css: commentHidden() == false ? 'collapse-icon' : 'expand-icon', event: {click : toggleComment }"></a>
+                        <div class="question-toggler-box">
+                          <a href="#" class="question-toggler" data-bind="attr: { title: (answerHidden() == false ? 'collapse' : 'expand')}, css: answerHidden() == false ? 'collapse-icon' : 'expand-icon', event: {click : toggleAnswer }"></a>
                         </div>
                       </div>
-                      <div class="comment-body post-body">
-                        <div class="comment-details" data-bind="if: commentHidden() == false">
-                          <p class="comment-details-text" data-bind="attr: { class: 'comment-details-text' }, html: text">
+                      <div class="answer-body question-body">
+                        <div class="answer-details" data-bind="if: answerHidden() == false">
+                          <p class="answer-details-text" data-bind="attr: { class: 'answer-details-text' }, text: text">
                           </p>
 
-                          <ul class="comment-attributes">
+                          <ul class="answer-attributes">
                           <?php
-                            if($eligible_to_comment) {
+                            if($eligible_to_answer) {
                           ?>
-                            <li rel="popover" class="comment-action comment-like" data-bind="css: { active: commentLiked() == true, loading: commentLikeLoading() }, attr: {title: commentLikeTitle()}, event: { click: function() { sendLikeDislike(1) } }" data-action-type="comment-like">
-                              <i class="far fa-thumbs-up icon" data-bind="css: {hide: commentLikeLoading() }"></i>
-                              <i class="fas fa-spinner loading-icon" data-bind="css: {hide: !commentLikeLoading() }"></i>
-                              <span class="react-count" data-bind="text: commentLikesCount"></span>
+                            <li class="answer-action answer-like" data-bind="event: { click: (view_user_id == user_id) ? popoverLikeDislike : sendLikeDislike.bind($data,1) }, css: { active: answerLiked() == true, loading: answerLikeLoading() }, attr: { title: (view_user_id == user_id) ? '' : answerLikeTitle(), 'data-content': (view_user_id == user_id) ? 'You cannot like your own Answer' : ''}" data-action-type="answer-like">
+                              <i class="far fa-thumbs-up icon" data-bind="css: {hide: answerLikeLoading() }"></i>
+                              <i class="fas fa-spinner loading-icon" data-bind="css: {hide: !answerLikeLoading() }"></i>
+                              <span class="react-count" data-bind="text: answerLikesCount"></span>
                             </li>
                             <li class="list-divider"></li>
-                            <li rel="popover" class="comment-action comment-dislike" data-bind="css: { active: commentDisliked() == true, loading: commentDislikeLoading() }, attr: {title: commentDislikeTitle()}, event: { click: function() { sendLikeDislike(0) } }" data-action-type="comment-dislike">
-                              <i class="far fa-thumbs-down icon" data-bind="css: {hide: commentDislikeLoading() }"></i>
-                              <i class="fas fa-spinner loading-icon" data-bind="css: {hide: !commentDislikeLoading() }"></i>
-                              <span class="react-count" data-bind="text: commentDislikesCount"></span>
+                            <li rel="popover" class="answer-action answer-dislike" data-bind="css: { active: answerDisliked() == true, loading: answerDislikeLoading() }, attr: { title: (view_user_id == user_id) ? '' : answerDislikeTitle(), 'data-content': (view_user_id == user_id) ? 'You cannot dislike your own Answer' : ''}, event: { click: (view_user_id == user_id) ? popoverLikeDislike : sendLikeDislike.bind($data,0) }" data-action-type="answer-dislike">
+                              <i class="far fa-thumbs-down icon" data-bind="css: {hide: answerDislikeLoading() }"></i>
+                              <i class="fas fa-spinner loading-icon" data-bind="css: {hide: !answerDislikeLoading() }"></i>
+                              <span class="react-count" data-bind="text: answerDislikesCount"></span>
                             </li>
                             <li class="list-divider"></li>
-                            <li class="comment-action add-reply-trigger" data-bind="event: { click: showReplyBox }, css: {active: replyBoxOpen() } ">
+                            <li class="answer-action add-reply-trigger" data-bind="event: { click: showReplyBox }, css: {active: replyBoxOpen() } ">
                               <span>Reply</span>
                             </li>
                           <?php
                             } else {
                           ?>
-                            <li class="comment-action-ineligible">
-                              <span class="react-count" data-bind="text: commentLikesCount"></span>
-                              <span data-bind="text: ' Like'+(commentLikesCount()>1 ? 's' : '')"></span>
+                            <li class="answer-action-ineligible">
+                              <span class="react-count" data-bind="text: answerLikesCount"></span>
+                              <span data-bind="text: ' Like'+(answerLikesCount()>1 ? 's' : '')"></span>
                             </li>
                             <li class="list-divider"></li>
-                            <li class="comment-action-ineligible">
-                              <span class="react-count" data-bind="text: commentDislikesCount"></span>
-                              <span data-bind="text: ' Dislike'+(commentDislikesCount()>1 ? 's' : '')"></span>
+                            <li class="answer-action-ineligible">
+                              <span class="react-count" data-bind="text: answerDislikesCount"></span>
+                              <span data-bind="text: ' Dislike'+(answerDislikesCount()>1 ? 's' : '')"></span>
                             </li>
                           <?php
                             }
                           ?>
                           </ul>
                           <?php
-                            if($eligible_to_comment) {
+                            if($eligible_to_answer) {
                           ?>
-                          <div class="post-add-reply add-comment post-section" data-bind="css: { hide: replyBoxOpen() == false }">
+                          <div class="question-add-reply add-answer question-section" data-bind="css: { hide: replyBoxOpen() == false }">
                             <div class="reply-user-icon-box icon-small-box">
                               <a data-bind="attr: { href: 'user.php?id=' + view_user_id }" title="You"><img data-bind="attr: {src: 'images/'+view_user_profile_image }"/></a>
                             </div>
                             <div class="add-reply-box">
                               <div class="form-group">
-                                <textarea class="form-control post-input reply-input" placeholder="Add a reply..." data-bind="value: replyInputText, valueUpdate:['afterkeydown','propertychange','input'], hasFocus: replyInputFocused(), event: { blur: replyInputRemoveFocus(), focus: replyInputAddFocus}"></textarea>
+                                <textarea class="form-control question-input reply-input" placeholder="Add a reply..." data-bind="value: replyInputText, valueUpdate:['afterkeydown','propertychange','input'], hasFocus: replyInputFocused(), event: { blur: replyInputRemoveFocus(), focus: replyInputAddFocus}"></textarea>
                                 <span class="reply-input-count">
                                   <span class="reply-input-count-text" data-bind="text: replyInputTextCount, css: { over: replyInputTextExceeded() }"></span>
                                 </span>
                               </div>
-                              <div class="form-group post-btn-box">
+                              <div class="form-group question-btn-box">
                                 <button class="btn clear-btn " data-bind="event: { click: hideReplyBox } ">Cancel</button>
-                                <button class="btn reply-btn post-btn" data-bind="event: { click: makeReply }, css: { disabled: replyBtnDisabled() }">Reply</button>
+                                <button class="btn reply-btn question-btn" data-bind="event: { click: makeReply }, css: { disabled: replyBtnDisabled() }">Reply</button>
                               </div>
                             </div>
                           </div>
@@ -444,7 +461,7 @@
                             <div class="replies" data-bind="if: totalReplies() > 0 && repliesHidden() == false">
                               <div data-bind="foreach: replies">
                                 <div class="reply">
-                                  <div class="reply-wrap post-section" data-bind="css: { collapsed: replyHidden() == true, owner: is_owner }">
+                                  <div class="reply-wrap question-section" data-bind="css: { collapsed: replyHidden() == true, owner: is_owner }">
                                     <div class="reply-user-icon-box icon-small-box">
                                       <a data-bind="attr: { href: 'user.php?id='+user_id }">
                                         <img data-bind="attr: { src: 'images/'+user_profile_image }">
@@ -461,8 +478,8 @@
                                             <span class="reply-time" data-bind="attr: {title: date}, text: how_long"></span>
                                           </li>
                                         </ul>
-                                        <div class="post-toggler-box">
-                                          <a href="#" class="post-toggler" data-bind="attr: { title: (replyHidden() == false ? 'collapse' : 'expand')}, css: replyHidden() == false ? 'collapse-icon' : 'expand-icon', event: {click : toggleReply }"></a>
+                                        <div class="question-toggler-box">
+                                          <a href="#" class="question-toggler" data-bind="attr: { title: (replyHidden() == false ? 'collapse' : 'expand')}, css: replyHidden() == false ? 'collapse-icon' : 'expand-icon', event: {click : toggleReply }"></a>
                                         </div>
                                       </div>
                                       <div class="reply-details" data-bind="if: replyHidden() == false">
@@ -470,15 +487,15 @@
                                         </p>
                                         <ul class="reply-attributes">
                                         <?php
-                                          if($eligible_to_comment) {
+                                          if($eligible_to_answer) {
                                         ?>
-                                          <li rel="popover" class="reply-action reply-like" data-bind="css: { active: replyLiked() == true, loading: replyLikeLoading() }, attr: {title: replyLikeTitle()}, event: { click: function() { sendLikeDislike(1) } }" data-action-type="reply-like">
+                                          <li rel="popover" class="reply-action reply-like" data-bind="css: { active: replyLiked() == true, loading: replyLikeLoading() }, attr: {title: (view_user_id == user_id) ? '' : replyLikeTitle(), 'data-content': (view_user_id == user_id) ? 'You cannot like your own Reply' : ''}, event: { click: (view_user_id == user_id) ? popoverLikeDislike : sendLikeDislike.bind($data,1) } " data-action-type="reply-like">
                                             <i class="far fa-thumbs-up icon" data-bind="css: {hide: replyLikeLoading() }"></i>
                                             <i class="fas fa-spinner loading-icon" data-bind="css: {hide: !replyLikeLoading() }"></i>
                                             <span class="react-count" data-bind="text: replyLikesCount"></span>
                                           </li>
                                           <li class="list-divider"></li>
-                                          <li rel="popover" class="reply-action reply-dislike" data-bind="css: { active: replyDisliked() == true, loading: replyDislikeLoading() }, attr: {title: replyDislikeTitle()}, event: { click: function() { sendLikeDislike(0) } }" data-action-type="reply-dislike">
+                                          <li rel="popover" class="reply-action reply-dislike" data-bind="css: { active: replyDisliked() == true, loading: replyDislikeLoading() }, attr: {title: (view_user_id == user_id) ? '' : replyDislikeTitle(), 'data-content': (view_user_id == user_id) ? 'You cannot dislike your own Reply' : ''}, event: { click: (view_user_id == user_id) ? popoverLikeDislike : sendLikeDislike.bind($data,0) }" data-action-type="reply-dislike">
                                             <i class="far fa-thumbs-down icon" data-bind="css: {hide: replyDislikeLoading() }"></i>
                                             <i class="fas fa-spinner loading-icon" data-bind="css: {hide: !replyDislikeLoading() }"></i>
                                             <span class="react-count" data-bind="text: replyDislikesCount"></span>
@@ -525,11 +542,11 @@
 
               </div>
 
-              <div class="view-more-box" data-bind="if: loadedCommentsCount() < totalComments() && loadedCommentsCount() > 0">
-                <a data-bind="event: { click: reloadComments }" href="#" class="view-more view-more-big">view more answers</a>
-                <span class="track track-big" data-bind="text: commentTrack()"></span>
+              <div class="view-more-box" data-bind="if: ((loadedAnswersCount() < totalAnswers() && loadedAnswersCount() > 0) || (showAllAnswersOption() == true && totalAnswers() > 1))">
+                <a data-bind="event: { click: fetchAnswers }, text: ((showAllAnswersOption() == true) ? 'view all answers' : 'view more answers')" href="#" class="view-more view-more-big"></a>
+                <span class="track track-big" data-bind="text: answerTrack()"></span>
               </div>
-              <span class="load-more-finished" data-bind="if: loadedCommentsCount() > 10 && loadedCommentsCount() == totalComments()">
+              <span class="load-more-finished" data-bind="if: loadedAnswersCount() > 10 && loadedAnswersCount() == totalAnswers()">
                 No more answers to show
               </span>
             </div>
@@ -543,13 +560,13 @@
 
       <script type="text/javascript">
         <?php
-          $comment_count = 0;
-          //get the count of the comments to the post
-          $stmt = $dbc->prepare("SELECT COUNT(*) FROM comment WHERE post_id = ? AND parent_comment_id IS NULL");
-          $stmt->bind_param("i", $post_id);
+          $answer_count = 0;
+          //get the count of the answers to the question
+          $stmt = $dbc->prepare("SELECT COUNT(*) FROM answer WHERE question_id = ? AND parent_answer_id IS NULL");
+          $stmt->bind_param("i", $question_id);
           $stmt->execute();
           $stmt->store_result();
-          $stmt->bind_result($comment_count);
+          $stmt->bind_result($answer_count);
           $stmt->fetch();
           $stmt->free_result();
           $stmt->close();
@@ -559,22 +576,42 @@
             'view_user_username' => $view_user_username,
             'view_user_profile_image' => $view_user_profile_image,
             'view_user_id' => $view_user_id,
-            'eligible_to_comment' => $eligible_to_comment,
+            'eligible_to_answer' => $eligible_to_answer,
             'loggedin' => $loggedin,
-            'post_id' => $post_id,
-            'post_liked' => $like_post,
-            'post_disliked' => $dislike_post,
-            'post_likes_count' => $post_likes_count,
-            'post_dislikes_count' => $post_dislikes_count,
-            'is_post_saved' => $is_post_saved,
-            'total_comments' => null,//$post_comments_count,
-            'comments' => array()
+            'question_id' => $question_id,
+            'question_user_id' => $question_user_id,
+            'question_liked' => $like_question,
+            'question_disliked' => $dislike_question,
+            'question_likes_count' => $question_likes_count,
+            'question_dislikes_count' => $question_dislikes_count,
+            'question_score' => $question_score,
+            'is_question_saved' => $is_question_saved,
+            'answer_focus_id' => $answer_focus_id,
+            'answer_focus_user_id' => $answer_focus_user_id,
+            'answer_focus_shown' => ($answer_focus_id == null ? false : true),
+            'total_answers' => null,//$question_answers_count,
+            'answers' => array()
           );
 
           //conert payload to json
           echo "var json_payload = " . json_encode($a) . ";";
         ?>
         var model;
+
+        function popoverLikeDislike(self, e) {
+          $(e.currentTarget).popover({
+            placement: 'auto',
+            trigger: 'focus'
+          });
+          $(e.currentTarget).popover('show');
+          setTimeout(()=> $(e.currentTarget).popover('hide'), 2200);
+        }
+
+        //function to decode the characters and print them as text
+        function htmlDecode( html ) {
+            let a = document.createElement( 'a' ); a.innerHTML = html;
+            return a.textContent;
+        };
 
         function replyModel(data) {
           var self = this;
@@ -596,7 +633,7 @@
             if((is_like == 0 && self.replyDislikeLoading() == true) || (is_like == 1 && self.replyLikeLoading() == true)) {
               return;
             }
-            var payload = { is_like: is_like, post_id: self.post_id, comment_id: self.comment_id, reply_id: self.id};
+            var payload = { is_like: is_like, question_id: self.question_id, answer_id: self.answer_id, reply_id: self.id};
             $.get('like_reply.php', payload, 
               function(data, status) {
                 (is_like) ? self.replyLikeLoading(true) : self.replyDislikeLoading(true);
@@ -615,9 +652,9 @@
           };
           self.how_long = data.reply_how_long;
           self.id = data.reply_id;
-          self.comment_id = data.comment_id;
-          self.post_id = data.post_id;
-          self.text = data.reply_text;
+          self.answer_id = data.answer_id;
+          self.question_id = data.question_id;
+          self.text = htmlDecode(data.reply_text);
           self.user_forum = data.reply_user_forum;
           self.user_id = data.reply_user_id;
           self.view_user_id = data.view_user_id;
@@ -637,23 +674,23 @@
           self.toggleReply = function() { self.replyHidden(!self.replyHidden()); };
         }
 
-        function commentModel(data) {
+        function answerModel(data) {
           var self = this;
-          self.date = data.comment_date;
-          self.commentLikesCount = ko.observable(data.comment_likes_count);
-          self.commentDislikesCount = ko.observable(data.comment_dislikes_count);
-          self.how_long = data.comment_how_long;
-          self.id = data.comment_id;
+          self.date = data.answer_date;
+          self.answerLikesCount = ko.observable(data.answer_likes_count);
+          self.answerDislikesCount = ko.observable(data.answer_dislikes_count);
+          self.how_long = data.answer_how_long;
+          self.id = data.answer_id;
           self.totalReplies = ko.observable(data.total_replies);
           self.loadedRepliesCount = ko.observable(data.loaded_replies);
-          self.text = data.comment_text;
-          self.user_forum = data.comment_user_forum;
-          self.user_id = data.comment_user_id;
-          self.user_profile_image = data.comment_user_profile_image;
-          self.user_username = data.comment_user_username;
-          self.commentDisliked = ko.observable(data.comment_disliked);
-          self.commentLiked = ko.observable(data.comment_liked);
-          self.post_id = data.post_id;
+          self.text = htmlDecode(data.answer_text);
+          self.user_forum = data.answer_user_forum;
+          self.user_id = data.answer_user_id;
+          self.user_profile_image = data.answer_user_profile_image;
+          self.user_username = data.answer_user_username;
+          self.answerDisliked = ko.observable(data.answer_disliked);
+          self.answerLiked = ko.observable(data.answer_liked);
+          self.question_id = data.question_id;
           self.view_user_id = data.view_user_id;
           self.view_user_profile_image = data.view_user_profile_image;
           self.repliesHidden = ko.observable(true);
@@ -672,33 +709,33 @@
             if(self.replyInputFocused() == false)
               self.replyInputFocused(true);
           };
-          self.commentLikeLoading = ko.observable(false);
-          self.commentDislikeLoading = ko.observable(false);
-          self.commentLikeTitle = ko.computed(function () {
-              return (self.commentLiked()) ? 'Remove like' : 'I like this Answer';
+          self.answerLikeLoading = ko.observable(false);
+          self.answerDislikeLoading = ko.observable(false);
+          self.answerLikeTitle = ko.computed(function () {
+              return (self.answerLiked()) ? 'Remove like' : 'I like this Answer';
           });
-          self.commentDislikeTitle = ko.computed(function () {
-              return (self.commentDisliked()) ? 'Remove dislike' : 'I dislike this Answer';
+          self.answerDislikeTitle = ko.computed(function () {
+              return (self.answerDisliked()) ? 'Remove dislike' : 'I dislike this Answer';
           });
           self.sendLikeDislike = function(is_like) {
             //don't process if clicked twice or more in succession
-            if((is_like == 0 && self.commentDislikeLoading() == true) || (is_like == 1 && self.commentLikeLoading() == true)) {
+            if((is_like == 0 && self.answerDislikeLoading() == true) || (is_like == 1 && self.answerLikeLoading() == true)) {
               return;
             }
-            var payload = { is_like: is_like, post_id: self.post_id, comment_id: self.id};
-            $.get('like_comment.php', payload, 
+            var payload = { is_like: is_like, question_id: self.question_id, answer_id: self.id};
+            $.get('like_answer.php', payload, 
               function(data, status) {
-                (is_like) ? self.commentLikeLoading(true) : self.commentDislikeLoading(true);
+                (is_like) ? self.answerLikeLoading(true) : self.answerDislikeLoading(true);
                 if(status == "success") {
                   if(data.isErr == false) {
-                    self.commentLikesCount(data.message.comment_likes_count); 
-                    self.commentDislikesCount(data.message.comment_dislikes_count); 
-                    self.commentLiked(data.message.comment_liked); 
-                    self.commentDisliked(data.message.comment_disliked); 
-                    (is_like) ? self.commentLikeLoading(false) : self.commentDislikeLoading(false);
+                    self.answerLikesCount(data.message.answer_likes_count); 
+                    self.answerDislikesCount(data.message.answer_dislikes_count); 
+                    self.answerLiked(data.message.answer_liked); 
+                    self.answerDisliked(data.message.answer_disliked); 
+                    (is_like) ? self.answerLikeLoading(false) : self.answerDislikeLoading(false);
                   }
                 } else {
-                  (is_like) ? self.commentLikeLoading(false) : self.commentDislikeLoading(false);
+                  (is_like) ? self.answerLikeLoading(false) : self.answerDislikeLoading(false);
                 }
               }, "json");
           };
@@ -760,7 +797,7 @@
             if(self.loadedRepliesCount() != undefined || self.loadedRepliesCount() != null) {
               limit = self.loadedRepliesCount() + 10;
             } 
-            var payload = { post_id: self.post_id, comment_id: self.id, limit: limit };
+            var payload = { question_id: self.question_id, answer_id: self.id, limit: limit };
             $.get('load_more_replies.php', payload, 
             function(data, status) {
               var dataObj = JSON.parse(data);
@@ -796,8 +833,8 @@
             self.loadedRepliesCount(data.loaded_replies);
           };
 
-          self.commentHidden = ko.observable(false);
-          self.toggleComment = function() { self.commentHidden(!self.commentHidden()); };
+          self.answerHidden = ko.observable(false);
+          self.toggleAnswer = function() { self.answerHidden(!self.answerHidden()); };
           
           self.makeReply = function() {
             
@@ -812,9 +849,9 @@
             //show the loading box
             self.repliesLoading(true);
             
-            var post_payload = { post_id: self.post_id, comment_id: self.id, body: body }
+            var question_payload = { question_id: self.question_id, answer_id: self.id, body: body }
 
-            $.post('make_reply.php', post_payload, function(data, status) {
+            $.post('make_reply.php', question_payload, function(data, status) {
               if(status == "success") {
                 var dataObj = JSON.parse(data);
                 self.clearReplyBox();
@@ -827,7 +864,7 @@
                   self.reset(json_payload);
 
                   //display feedback and remove any feedback span present
-                  $('.postive-feedback').remove();
+                  $('.questionive-feedback').remove();
                   var $feedback = $('body').append('<span class="positive-feedback"></span>');
                   $('.positive-feedback').text('Reply Added!');
                   setTimeout(function(){
@@ -845,7 +882,7 @@
           };
 
           self.replies = ko.observableArray('');
-          self.postActionTitle = function (type, is_like, liked) {
+          self.questionActionTitle = function (type, is_like, liked) {
             var str = '';
             if(liked) {
               str = `Remove ${is_like}`;
@@ -857,164 +894,143 @@
 
         }
 
+        var sortTypesAvailable = ['newest', 'oldest', 'score'];
+
         function AppViewModel() {
           var self = this;
-          //convert each comment to a model and store in an array
-          var mappedComments = json_payload.comments.map(comment => new commentModel(comment));
-          self.comments = ko.observableArray(mappedComments);
-          self.bgColor = function (char) {
-            var colors = ["gray", "maroon", "olive", "teal", "fucshia", "purple", ""];
-            //convert the alphabet to ASCII value
-            var value = Number(char.toLowerCase().charCodeAt(0));
-            //ASCII a-z is 97-122
-            var color = "";
-            //I used true in the swutch case because js uses the value passed in the switch case as the basis to compare, in this case any case that matches 'true'
-            switch (true) {
-              case value <= 105:
-                color = "gray";
-                break;
-              case value <= 109:
-                color = "maroon";
-                break;
-              case value <= 113:
-                color = "olive";
-                break;
-              case value <= 117:
-                color = "teal";
-                break;
-              case value <= 121:
-                color = "fucshia";
-                break;
-              case value <= 124:
-                color = "purple";
-                break;
-              
-              default:
-                color = "purple";
-                break;
-            }
-            return color;
-          };
-          self.isPostSaved = ko.observable(json_payload.is_post_saved);
-          self.totalComments = ko.observable(json_payload.total_comments);
-          self.loadedCommentsCount = ko.observable(self.comments().length);
-          self.getTotalComments = ko.computed(function(){
-            var len = self.totalComments();
+          //flag to store the sort type
+          self.sortAnswerType = ko.observable('newest');
+
+          //convert each answer to a model and store in an array
+          var mappedAnswers = json_payload.answers.map(answer => new answerModel(answer));
+          self.answers = ko.observableArray(mappedAnswers);
+          self.answerFocusID = json_payload.answer_focus_id;
+          self.answerFocusUserID = json_payload.answer_focus_user_id;
+          self.answerFocusShown = ko.observable(json_payload.answer_focus_shown);
+          self.isQuestionSaved = ko.observable(json_payload.is_question_saved);
+          self.totalAnswers = ko.observable(json_payload.total_answers);
+          self.loadedAnswersCount = ko.observable(self.answers().length);
+          self.getTotalAnswers = ko.computed(function(){
+            var len = self.totalAnswers();
             return `${len} Answer${(len > 1) ? 's' :''}`;
           });
           self.viewUserID = json_payload.view_user_id;
-          self.postID = json_payload.post_id;
+          self.questionID = json_payload.question_id;
           self.viewUserProfileImage = json_payload.view_user_profile_image;
-          self.eligibleToComment = json_payload.eligible_to_comment;
+          self.eligibleToAnswer = json_payload.eligible_to_answer;
           self.isLoggedIn = json_payload.is_loggedin;
-          self.commentTrack = ko.computed(function(){
-            return `${self.loadedCommentsCount()} of ${self.totalComments()}`;
+          self.answerTrack = ko.computed(function(){
+            return `${self.loadedAnswersCount()} of ${self.totalAnswers()}`;
           });
-          self.postLikesCount = ko.observable(json_payload.post_likes_count);
-          self.postDislikesCount = ko.observable(json_payload.post_dislikes_count);
-          self.postScore = ko.computed(function(){
-            return (self.postLikesCount() * 3) - (self.postDislikesCount() * 3);
+          self.questionLikesCount = ko.observable(json_payload.question_likes_count);
+          self.questionDislikesCount = ko.observable(json_payload.question_dislikes_count);
+          self.questionScore = ko.observable(json_payload.question_score);
+          self.questionUserID = json_payload.question_user_id;
+          self.questionLiked = ko.observable(json_payload.question_liked);
+          self.questionDisliked = ko.observable(json_payload.question_disliked);
+          self.questionLikeTitle = ko.computed(function () {
+              return (self.questionLiked()) ? 'Remove like' : 'I like this Question';
           });
-          self.postLiked = ko.observable(json_payload.post_liked);
-          self.postDisliked = ko.observable(json_payload.post_disliked);
-          self.postLikeTitle = ko.computed(function () {
-              return (self.postLiked()) ? 'Remove like' : 'I like this Question';
-          });
-          self.postDislikeTitle = ko.computed(function () {
-              return (self.postDisliked()) ? 'Remove dislike' : 'I dislike this Question';
+          self.questionDislikeTitle = ko.computed(function () {
+              return (self.questionDisliked()) ? 'Remove dislike' : 'I dislike this Question';
           });
 
-          self.reset = function (data, emptyComment = false) {
+          self.reset = function (data, emptyAnswer = false) {
             var payload = data;
-            //convert each comment into a comment Model and store in an array
-            var mappedComments = data.comments.map(comment => new commentModel(comment));
-            if(emptyComment){ self.comments([]); };
-            self.comments.push(...mappedComments);
-            self.totalComments(payload.total_comments);
-            self.loadedCommentsCount(self.comments().length);
+            //convert each answer into a answer Model and store in an array
+            var mappedAnswers = data.answers.map(answer => new answerModel(answer));
+            if(emptyAnswer){ self.answers([]); };
+            self.answers.push(...mappedAnswers);
+            self.totalAnswers(payload.total_answers);
+            self.loadedAnswersCount(self.answers().length);
           };
 
-          self.commentsLoading = ko.observable(false);
-          self.commentInputText = ko.observable('');
-          self.commentBoxOpen = ko.observable(false);
-          self.commentBtnDisabled = ko.observable(true);
-          self.commentInputTextExceeded = ko.observable(false);
-          self.commentInputTextCount = ko.computed(function() {
-            var len = self.commentInputText().trim().length;
+          self.answersLoading = ko.observable(false);
+          self.answerInputText = ko.observable('');
+          self.answerBoxOpen = ko.observable(false);
+          self.answerBtnDisabled = ko.observable(true);
+          self.answerInputTextExceeded = ko.observable(false);
+          self.showAllAnswersOption = ko.observable(false);
+          self.answerInputTextCount = ko.computed(function() {
+            var len = self.answerInputText().trim().length;
             if(len > 0 && len <= 1000) {
-              self.commentBtnDisabled(false);
+              self.answerBtnDisabled(false);
             } else {
-              self.commentBtnDisabled(true);
+              self.answerBtnDisabled(true);
             }
             if(len > 1000) {
-              self.commentInputTextExceeded(true);
+              self.answerInputTextExceeded(true);
             } else {
-              self.commentInputTextExceeded(false)
+              self.answerInputTextExceeded(false)
             }
             return `${len}/1000`;
           });
 
-          self.clearCommentBox = function() {
+          self.clearAnswerBox = function() {
             //empty the reply input
-            self.commentInputText('');
-            self.commentBoxOpen(false);
+            self.answerInputText('');
+            self.answerBoxOpen(false);
           };
-          self.hideCommentBox = function() {
-            //close the comment box
-            self.commentBoxOpen(false);
+          self.hideAnswerBox = function() {
+            //close the answer box
+            self.answerBoxOpen(false);
           }
-          self.showCommentBox = function() {
-            if(self.commentBoxOpen()) {
+          self.showAnswerBox = function() {
+            if(self.answerBoxOpen()) {
               return;
             }
-            //open the comment box
-            self.commentBoxOpen(true);
+            //open the answer box
+            self.answerBoxOpen(true);
           }
-          self.makeComment = function () {
+          self.makeAnswer = function () {
             //return if button is disabled
-            if (self.commentBtnDisabled() || self.commentInputTextExceeded()) {
+            if (self.answerBtnDisabled() || self.answerInputTextExceeded()) {
               return;
             }
 
             //show the loading box
-            self.commentsLoading(true);
+            self.answersLoading(true);
             
-            //post parameters
-            var postID = self.postID;
-            var body = self.commentInputText().trim();
+            //question parameters
+            var questionID = self.questionID;
+            var body = self.answerInputText().trim();
 
-            $.post('make_comment.php', {body: body, id: postID}, function(data, status) {
+            $.post('make_answer.php', {body: body, id: questionID}, function(data, status) {
               if(status == "success") {
+                console.log(data);
                 var dataObj = JSON.parse(data);
                 var msg = dataObj.message;
                 
                 if(dataObj.isErr === true) {
                   //displayError(msg, $errorBox);         
                 } else if(dataObj.isErr === false) {
-                  //clear and hide the comment box
-                  self.clearCommentBox();
+                  //clear and hide the answer box
+                  self.clearAnswerBox();
                   
                   self.reset(msg, true);
-                  displayFeedback('Comment Added!');
+                  displayFeedback('Answer Added!');
+
+                  //reset the answer type to newest
+                  self.sortAnswerType('newest');
                   
                 }
-                self.commentsLoading(false);
+                self.answersLoading(false);
               } else {
-                self.commentsLoading(false);
+                self.answersLoading(false);
               }
             });
           };
-          self.postLikeLoading = ko.observable(false);
-          self.postDislikeLoading = ko.observable(false);
-          self.savePost = function() {
-            var payload = { post_id: self.postID};
-            $.get('save_post.php', payload, 
+          self.questionLikeLoading = ko.observable(false);
+          self.questionDislikeLoading = ko.observable(false);
+          self.saveQuestion = function() {
+            var payload = { question_id: self.questionID};
+            $.get('save_question.php', payload, 
               function(data, status) {
                 if(status == "success") {
                   if(data.isErr == false) {
-                    self.isPostSaved(data.message.is_post_saved);
-                    if(self.isPostSaved() == true) {
-                      displayFeedback('Post Saved!');
+                    self.isQuestionSaved(data.message.is_question_saved);
+                    if(self.isQuestionSaved() == true) {
+                      displayFeedback('Question Saved!');
                     }
                   }
                 } 
@@ -1022,62 +1038,100 @@
           };
           self.sendLikeDislike = function(is_like) {
             //don't process if clicked twice or more in succession
-            if((is_like == 0 && self.postDislikeLoading() == true) || (is_like == 1 && self.postLikeLoading() == true)) {
+            if((is_like == 0 && self.questionDislikeLoading() == true) || (is_like == 1 && self.questionLikeLoading() == true)) {
               return;
             }
-            var payload = { is_like: is_like, post_id: self.postID};
-            $.get('like_post.php', payload, 
+            var payload = { is_like: is_like, question_id: self.questionID};
+            $.get('like_question.php', payload, 
               function(data, status) {
-                (is_like) ? self.postLikeLoading(true) : self.postDislikeLoading(true);
+                (is_like) ? self.questionLikeLoading(true) : self.questionDislikeLoading(true);
                 if(status == "success") {
                   if(data.isErr == false) {
-                    self.postLikesCount(data.message.post_likes_count); 
-                    self.postDislikesCount(data.message.post_dislikes_count); 
-                    self.postLiked(data.message.post_liked); 
-                    self.postDisliked(data.message.post_disliked);
-                    (is_like) ? self.postLikeLoading(false) : self.postDislikeLoading(false);
+                    self.questionLikesCount(data.message.question_likes_count); 
+                    self.questionDislikesCount(data.message.question_dislikes_count); 
+                    self.questionLiked(data.message.question_liked); 
+                    self.questionDisliked(data.message.question_disliked);
+                    self.questionScore(data.message.question_score);
+                    (is_like) ? self.questionLikeLoading(false) : self.questionDislikeLoading(false);
                   }
                 } else {
-                  (is_like) ? self.postLikeLoading(false) : self.postDislikeLoading(false);
+                  (is_like) ? self.questionLikeLoading(false) : self.questionDislikeLoading(false);
                 }
             }, "json");
           };
 
-          self.reloadComments = function () {
-            self.commentsLoading(true);
+          self.fetchAnswers = function() {
+            var resetAnswers = false;
+            if(self.answerFocusShown()) {
+              //if only a particular answer was shown before
+              self.answerFocusShown(false);
+              self.showAllAnswersOption(false);
+              resetAnswers = true;
+            }
+            self.reloadAnswers(resetAnswers);
+          }
+
+          //sort answers
+          self.sortAnswers = function(type) {
+            if(self.answerFocusShown()) {
+              return;
+            }
+            //validate the type
+            type = type.toLowerCase(type);
+            type = sortTypesAvailable.indexOf(type) != -1 ? type : 'newest';
+            self.sortAnswerType(type);
+            self.reloadAnswers(true);
+          };
+
+          self.reloadAnswers = function (resetAnswers = true) {
+            self.answersLoading(true);
+            let type = self.sortAnswerType();
+
             var start = 0;
-            if(self.loadedCommentsCount() != undefined || self.loadedCommentsCount() != null) {
-              start = self.loadedCommentsCount();
+            if(self.loadedAnswersCount() > 0 && resetAnswers == false) {
+              start = self.loadedAnswersCount();
             } 
-            var payload = { post_id: self.postID, start: start};
-            $.get('load_more_comments.php', payload, 
+            var payload = {};
+
+
+            if(self.answerFocusShown() == false){
+              payload = { question_id: self.questionID, start: start, sortType: type};
+            } else {
+              payload = { question_id: self.questionID, ansID: self.answerFocusID, sortType: type };
+              //if the user sees a particular answer, there should be an option to see all the comments normally
+              self.showAllAnswersOption(true);
+            }
+            $.get('load_more_answers.php', payload, 
               function(data, status) {
+                console.log(data);
                 if(status == "success") {
                   if(data.isErr == false) {
-                    self.reset(data.message);
+                    //reset the answers if aparticular answer was previously shown
+                    self.reset(data.message, resetAnswers);  
                   }
-                  self.commentsLoading(false);
+
+                  self.answersLoading(false);
                 } else {
-                  self.commentsLoading(false);
+                  self.answersLoading(false);
                 }
             }, "json");
           };
 
-          //Onload load the comments
+          //Onload load the answers
           $(document).ready(function() {
-            self.reloadComments();
+            self.reloadAnswers(true);  
           });
 
         }
         model = new AppViewModel();
-        /*model.comment.subscribe(function(newValue) {
+        /*model.answer.subscribe(function(newValue) {
             console.log("The person's new name is " , newValue);
         });*/
-        ko.applyBindings(model);
+        ko.applyBindings(model, document.getElementById("main_content"));
 
         function displayFeedback(msg) {
           //display feedback and remove any feedback span present
-          $('.postive-feedback').remove();
+          $('.questionive-feedback').remove();
           var $feedback = $('body').append('<span class="positive-feedback"></span>');
           $('.positive-feedback').text(msg);
           setTimeout(function(){
@@ -1089,21 +1143,27 @@
 
       </script>
 
-      <!-- Related Posts -->
+      <!-- Related Questions -->
       <div class="related">
         <p class="related-header">Related Questions</p>
-        <ul class="related-posts-box">
-          <li><a href="#" class="related-link">What is the difference between foor loop and while Loop?</a></li>
-          <li><a href="#" class="related-link">Why is for loop so common?</a></li>
-          <li><a href="#" class="related-link">Why is Africa in the center of the world?</a></li>
-          <li><a href="#" class="related-link">Does it snow in Africa much?</a></li>
-          <li><a href="#" class="related-link">What is a Safari?</a></li>
-          <li><a href="#" class="related-link">How much does it cost to travel around the world (Globe trotting)?</a></li>
-          <li><a href="#" class="related-link">Does it cost much to smile more?</a></li>
-          <li><a href="#" class="related-link">WHO what does that stand for in African parlance?</a></li>
-          <li><a href="#" class="related-link">How cold does it get during monsoon season in India?</a></li>
-          <li><a href="#" class="related-link">WHy are there hdfefb?</a></li>
-
+        <ul class="related-questions-box">
+          <?php
+            $question_tags_id = implode(',', $question_tags);
+            //Get related Questions
+            $stmt = $dbc->prepare("SELECT DISTINCT question_heading, q.question_id FROM question AS q
+            JOIN tag_associations AS ta ON q.question_id = ta.question_id 
+            WHERE ( question_heading LIKE CONCAT('%',?,'%') OR ta.tag_id IN ($question_tags_id) ) AND q.question_id <> ? LIMIT 10");
+            $stmt->bind_param("si", $heading, $question_id);
+            $stmt->execute();
+            $stmt->store_result();
+            $stmt->bind_result($related_question_heading, $related_question_id);
+            while($stmt->fetch()) {
+              ?>
+              <li><a href="<?php echo "question.php?id=$related_question_id" ?>" class="related-link"><?php echo $related_question_heading; ?></a></li>
+              <?php
+            }
+            $stmt->free_result();
+          ?>
         </ul>
       </div>
     </div>

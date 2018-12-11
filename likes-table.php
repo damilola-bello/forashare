@@ -64,3 +64,38 @@
     }
   }
 }
+
+
+self.bgColor = function (char) {
+  var colors = ["gray", "maroon", "olive", "teal", "fucshia", "purple", ""];
+  //convert the alphabet to ASCII value
+  var value = Number(char.toLowerCase().charCodeAt(0));
+  //ASCII a-z is 97-122
+  var color = "";
+  //I used true in the swutch case because js uses the value passed in the switch case as the basis to compare, in this case any case that matches 'true'
+  switch (true) {
+    case value <= 105:
+      color = "gray";
+      break;
+    case value <= 109:
+      color = "maroon";
+      break;
+    case value <= 113:
+      color = "olive";
+      break;
+    case value <= 117:
+      color = "teal";
+      break;
+    case value <= 121:
+      color = "fucshia";
+      break;
+    case value <= 124:
+      color = "purple";
+      break;
+    
+    default:
+      color = "purple";
+      break;
+  }
+  return color;
+};

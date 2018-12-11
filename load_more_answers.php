@@ -1,31 +1,41 @@
 <?php
-  if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+	if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+
 		require_once('includes/mysqli_connect.php');
 		require_once('checkifloggedin.php');
 
-  	$reply_count = 0;
+  	$answer_count = 0;
 		$return = array();
     
-    $limit = (empty($_GET['limit']) ? 10 : trim($_GET['limit']));
-    $answer_id = trim($_GET['answer_id']);
     $question_id = trim($_GET['question_id']);
 
-	  //validate the question id and the limit query
-	  if ( (is_numeric($limit) && filter_var($limit, FILTER_VALIDATE_INT) != false && intval($limit) > 0) && (is_numeric($question_id) && filter_var($question_id, FILTER_VALIDATE_INT) != false && intval($question_id) > 0) && (is_numeric($answer_id) && filter_var($answer_id, FILTER_VALIDATE_INT) != false && intval($answer_id) > 0) ) {
-      $question_id = intval($question_id);
-      $answer_id = intval($answer_id);
+    $start = 0;
+    $focus_answer_id = null;
 
-      //check if the answer exists
-  		$stmt = $dbc->prepare("SELECT answer_id FROM answer WHERE question_id = ? AND answer_id = ? AND parent_answer_id IS NULL");
-      $stmt->bind_param("ii", $question_id, $answer_id);
+    if( isset($_GET['start']) && (filter_var($_GET['start'], FILTER_VALIDATE_INT) === 0 || filter_var($_GET['start'], FILTER_VALIDATE_INT)) ) {
+      $start = intval($_GET['start']);
+    } else if( isset($_GET['ansID']) && (filter_var($_GET['ansID'], FILTER_VALIDATE_INT) === 0 || filter_var($_GET['ansID'], FILTER_VALIDATE_INT)) ) {
+      $focus_answer_id = intval($_GET['ansID']);
+    } else {
+      $errors [] = "Wrong parameters.";
+    }
+    
+	  //validate the question id and the start query
+	  if ( ( is_numeric($question_id) && filter_var($question_id, FILTER_VALIDATE_INT) != false) && (is_numeric($start) )) {
+      $question_id = intval($question_id);
+      $start = intval($start);
+
+      //check if the question exists
+  		$stmt = $dbc->prepare("SELECT question_id FROM question WHERE question_id = ?");
+      $stmt->bind_param("d", $question_id);
       $stmt->execute();
       $stmt->store_result();
       if($stmt->num_rows == 1) {
-        $stmt->bind_result($answer_id);
+        $stmt->bind_result($question_id);
         $stmt->fetch();
       } else {
-      	//answer does not exist
-      	$errors [] = "Answer not found.";
+      	//question does not exist
+      	$errors [] = "Question not found.";
       	$return = array("isErr" => true, "message" => $errors);
       }
       $stmt->free_result();
@@ -36,26 +46,40 @@
 			$return = array("isErr" => true, "message" => $errors);
     }
 
-    //if the parameters are ok, no errors and the answer exist
+    //if the parameters are ok, no errors and the question exist
     if(empty($errors)) {
-		//function to calculate how long the reply was made
+		//function to calculate how long the answer was made
 	  	require_once('includes/how_long.php');
 
-    	require_once('replies.php');
-    	$eligible_to_reply = false;
+    	require_once('includes/answer.php');
 
+      //sort type
+      $sortTypes = array('newest', 'oldest', 'score', 'active');
+
+      $sortType = 'newest';
+      //if sort type is specified
+      if(isset($_GET['sortType'])) {
+        $temp = strtolower($_GET['sortType']);
+        if (in_array($temp, $sortTypes)) {
+          $sortType = $temp;
+        }
+      }
+
+    	$eligible_to_answer = false;
+
+			//array to hold the return data
       // count the answers
-			$stmt = $dbc->prepare("SELECT COUNT(*) FROM answer WHERE question_id = ? AND parent_answer_id = ?");
-    	$stmt->bind_param("ii", $question_id, $answer_id);
+			$stmt = $dbc->prepare("SELECT COUNT(*) FROM answer WHERE question_id = ? AND parent_answer_id IS NULL");
+    	$stmt->bind_param("d", $question_id);
   		$stmt->execute();
   		$stmt->store_result();
-  		$stmt->bind_result($reply_count);
+  		$stmt->bind_result($answer_count);
   		$stmt->fetch();
   		$stmt->free_result();
 		  if($loggedin == true) {
 				$view_user_id = $_SESSION['user_id'];
-	  		//get the question details
-	  		$stmt = $dbc->prepare("SELECT p.question_id, t.tag_id FROM question AS p JOIN tag_associations AS ta ON p.question_id = ta.question_id JOIN tag AS t ON ta.tag_id = t.tag_id JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id WHERE p.question_id = ? AND tt.name = 'forum'");
+	  		//check if the question exists
+	  		$stmt = $dbc->prepare("SELECT q.question_id, t.tag_id FROM question AS q JOIN tag_associations AS ta ON q.question_id = ta.question_id JOIN tag AS t ON ta.tag_id = t.tag_id JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id WHERE q.question_id = ? AND tt.name = 'forum'");
 	      $stmt->bind_param("d", $question_id);
 	      $stmt->execute();
 	      $stmt->store_result();
@@ -82,14 +106,14 @@
 	          $stmt->fetch();
 	          //check if the commeter's forum matches with the question
 	          if($user_forum_id == $question_forum_id) {
-	          	$eligible_to_reply = true;
+	          	$eligible_to_answer = true;
 	          }
 	        }
 	        $stmt->free_result();
 	        $stmt->close();
 
       	} else if($question_owner_id != $view_user_id) {
-      		$eligible_to_reply = true;
+      		$eligible_to_answer = true;
       	}
 	  		
 	  		//get the user's profile picture/icon
@@ -103,11 +127,11 @@
         $stmt->close();
         unset($stmt);
 
-
-    		$return = array("isErr" => false, "message" => show_replies($dbc, $question_id, $reply_count, $answer_id, $loggedin, $limit, $eligible_to_reply, $view_user_username, $view_user_profile_image, $view_user_id));
+        $limit = 10;
+    		$return = array("isErr" => false, "message" => make_answer($dbc, $question_id, $answer_count, $loggedin, $focus_answer_id, $sortType, $start, $limit, $eligible_to_answer, $view_user_username, $view_user_profile_image, $view_user_id));
 			} else {
 				//if not logged in
-				$return = array("isErr" => false, "message" => show_replies($dbc, $question_id, $reply_count, $answer_id, $loggedin, $limit));
+        $return = array("isErr" => false, "message" => make_answer($dbc, $question_id, $answer_count, $loggedin, $focus_answer_id, $sortType, $start));
 			}
 			
     }

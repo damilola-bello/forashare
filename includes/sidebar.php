@@ -15,13 +15,13 @@
       <li class="countries-nav<?php if($page == FORUM) { echo ' active-nav'; } ?>">
         <a href="./countries.php">Countries</a>
       </li>
-      <li class="tags-nav<?php if($page == TOPIC) { echo ' active-nav'; } ?>">
-        <a href="./topics.php">Tags</a>
+      <li class="tags-nav<?php if($page == TAG) { echo ' active-nav'; } ?>">
+        <a href="./tags.php">Tags</a>
       </li>
       <li class="users-nav<?php if($page == USER) { echo ' active-nav'; } ?>">
         <a href="./users.php">Users</a>
       </li>
-      <li class="posts-nav<?php if($page == QUESTION) { echo ' active-nav'; } ?>">
+      <li class="questions-nav<?php if($page == QUESTION) { echo ' active-nav'; } ?>">
         <a href="./questions.php">Questions</a>
       </li>
     </ul>

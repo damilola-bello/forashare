@@ -1,2 +1,2 @@
 # Dependency directory
-read.txt
+includes/mysqli_connect.php

@@ -4,7 +4,7 @@
 
 define('HOME', 'home');
 define('FORUM', 'forum');
-define('TOPIC', 'topic');
+define('TAG', 'tag');
 define('USER', 'user');
 define('QUESTION', 'question');
 ?>

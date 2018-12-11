@@ -1,5 +1,4 @@
 <?php
-	//if post request
 	if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 		require_once('includes/mysqli_connect.php');
@@ -12,7 +11,9 @@
 
 			$errors = array();
 	  	$heading = (empty($_POST['heading']) ? null : trim($_POST['heading']));
+	  	$heading = str_replace("\r\n", "\n", $heading);
 	  	$body = (empty($_POST['body']) ? null : trim($_POST['body']));
+	  	$body = str_replace("\r\n", "\n", $body);
 	  	$forum = (empty($_POST['forum']) ? null : trim($_POST['forum']));
 	  	$tag_ids = (empty($_POST['tags']) ? null : json_decode($_POST['tags']));
 
@@ -21,7 +22,7 @@
 	  	if(empty($heading)) {
 	  		$errors [] = "Question heading cannot be empty.";
 	  	} else {
-	  		$heading_len = strlen($heading);
+	  		$heading_len = mb_strlen($heading);
 	  		if($heading_len < 5) {
 	  			$errors [] = "Question heading too short.";
 	  		} else if($heading_len > 100) {
@@ -33,7 +34,7 @@
 	  	if(empty($body)) {
 	  		$errors [] = "Question body cannot be empty.";
 	  	} else {
-	  		$body_len = strlen($body);
+	  		$body_len = mb_strlen($body);
 	  		if($body_len < 10) {
 	  			$errors [] = "Question body too short.";
 	  		} else if($body_len > 1500) {
@@ -43,10 +44,10 @@
 
 	  	//forum validation
 	  	if(empty($forum)) {
-	  		$errors [] = "Choose a forum to post to.";
+	  		$errors [] = "Choose a forum to question to.";
 	  	} else {
 	  		//check if forum exists
-				$stmt = $dbc->prepare("SELECT tag_id FROM forum_details WHERE alpha_code = ?");
+				$stmt = $dbc->prepare("SELECT tag_id FROM country_details WHERE alpha_code = ?");
 		    $stmt->bind_param("s", $forum);
 		    $stmt->execute();
 		    //Get the result of the query
@@ -175,7 +176,7 @@
 
   			//if the image(s) upload didn't result in errors
 	  		if(count($errors) == 0) {
-	  			$stmt = $dbc->prepare("INSERT INTO post (post_text, post_heading, post_date, user_id) VALUES (?, ?, NOW(), ?)");
+	  			$stmt = $dbc->prepare("INSERT INTO question (question_text, question_heading, question_date, user_id) VALUES (?, ?, NOW(), ?)");
 			    $stmt->bind_param("ssd", $body, $heading, $_SESSION['user_id']);
 			    //$stmt->execute();
 			    if ($stmt->execute()) {
@@ -186,18 +187,23 @@
 
 				    	//insert the question images if any
 				    	if(count($image_names) > 0) {
-				    		$stmt = $dbc->prepare("INSERT INTO post_images (post_id, image_name) VALUES (?, ?)");
+				    		$stmt = $dbc->prepare("INSERT INTO question_images (question_id, image_name) VALUES (?, ?)");
 					    	foreach ($image_names as $img_name) {
-					    		$stmt->bind_param("ds", $last_id, $img_name);
+					    		$stmt->bind_param("is", $last_id, $img_name);
 			    				$stmt->execute();
 					    	}
+
+					    	//update the question record to indicate it has an image
+					    	$stmt = $dbc->prepare("UPDATE question SET has_image = 1 WHERE question_id = ? ");
+					    	$stmt->bind_param("i", $last_id);
+			    			$stmt->execute();
 				    		//Close the statement
 								$stmt->close();
 								unset($stmt);
 				    	}
 				    
 				    	//insert the tag associations
-				    	$stmt = $dbc->prepare("INSERT INTO tag_associations (post_id, tag_id) VALUES (?, ?)");
+				    	$stmt = $dbc->prepare("INSERT INTO tag_associations (question_id, tag_id) VALUES (?, ?)");
 
 				    	//add the forum id as a tag
 				    	$stmt->bind_param("dd", $last_id, $forum_id);
@@ -211,6 +217,19 @@
 				    	//Close the statement
 							$stmt->close();
 							unset($stmt);
+
+							//update the count of the questions for the tags added
+							$stmt = $dbc->prepare("UPDATE tag AS t SET t.questions = (SELECT COUNT(ta.question_id) FROM tag_associations AS ta WHERE ta.tag_id = ?) WHERE t.tag_id = ?");
+							//add the forum id as a tag
+				    	$stmt->bind_param("ii", $forum_id, $forum_id);
+			    		$stmt->execute();
+
+				    	//loop through each tag and add it to the question
+				    	foreach ($tag_ids as $tag_id) {
+			    			$stmt->bind_param("ii", $tag_id, $tag_id);
+			    			$stmt->execute();
+				    	}
+
 
 				    	$return = array("isErr"=> false, "message"=> $last_id);
 				    }

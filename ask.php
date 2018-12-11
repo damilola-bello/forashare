@@ -65,7 +65,7 @@
               <span class="info-subcontent-title-text">Country</span>
             </div>
             <div class="info-subcontent">
-              <p><span class="optional">Required.</span><br>You can only post a question to a country at a time.</p>
+              <p><span class="optional">Required.</span><br>You can only answer a question to a country at a time.</p>
             </div>
           </div>
 
@@ -124,7 +124,7 @@
               </svg>
             </div>
           </div>
-          <textarea name="question_body" rows="7" data-max="1500" data-last-length="0" class="form-control question-body progressable-input" placeholder="Type in your question here."></textarea>
+          <textarea name="question_body" rows="7" data-max="1500" data-last-length="0" class="form-control question-body progressable-input" placeholder="Type in your question body here."></textarea>
           <span class="question-body-err error-lbl"></span>
         </div>
         
@@ -143,7 +143,7 @@
             $stmt->fetch();
             $stmt->close();
 
-            $query = "SELECT t.tag_name, t.tag_id, f.alpha_code FROM forum_details AS f JOIN tag AS t ON t.tag_id = f.tag_id JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id WHERE tt.name = 'forum' ORDER BY t.tag_name ASC";
+            $query = "SELECT t.tag_name, t.tag_id, c.alpha_code FROM country_details AS c JOIN tag AS t ON t.tag_id = c.tag_id JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id WHERE tt.name = 'forum' ORDER BY t.tag_name ASC";
             $r = mysqli_query($dbc, $query);
 
             echo '<select class="form-control question-forum" name="question_forum">';
@@ -165,7 +165,7 @@
                 <span>topics</span>&nbsp;&nbsp;<i class="fas fa-tags"></i>
               </a>
 
-              <ul class="dropdown-menu menu-filter dropdown-menu-left checkbox-dropdown" aria-labelledby="askQuestionTagLink">
+              <ul class="dropdown-menu menu-filter dropdown-menu-left checkbox-dropdown ask-topic-check" aria-labelledby="askQuestionTagLink">
                 <?php
                   //Select the default tags
                   $query = "SELECT tag_id, tag_name FROM tag AS t JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id WHERE tt.name = 'default_tag' ORDER BY t.tag_name ASC";

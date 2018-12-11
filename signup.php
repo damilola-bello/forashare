@@ -25,7 +25,7 @@
         $signup_errors[] = "Username cannot be empty.";
       } else {
         $username = trim($username);
-        $username_length = strlen($username);
+        $username_length = mb_strlen($username);
         if($username_length < 3 || $username_length > 25) {
           $signup_errors[] = "Username can only have 3-25 characters.";
         } else if (!preg_match("/^([a-zA-Z][a-zA-Z0-9_]{2,24})$/", $username)) {
@@ -41,7 +41,7 @@
         //Escape harmful characters
         $forum_sterilize = mysqli_real_escape_string($dbc, trim($forum));
 
-        $stmt = $dbc->prepare("SELECT tag_id FROM forum_details WHERE alpha_code = ?");
+        $stmt = $dbc->prepare("SELECT tag_id FROM country_details WHERE alpha_code = ?");
         $stmt->bind_param("s", $forum_sterilize);
         $stmt->execute();
         //Get the result of the query
@@ -193,7 +193,7 @@
                 <i class="far fa-question-circle label-info" tabindex="2" data-toggle="tooltip" data-placement="top" title="Choose a country you want to belong to"></i>
               </div>
               <?php
-                  $query = "SELECT t.tag_name, f.alpha_code FROM forum_details AS f JOIN tag AS t ON t.tag_id = f.tag_id JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id ORDER BY t.tag_name ASC";
+                  $query = "SELECT t.tag_name, c.alpha_code FROM country_details AS c JOIN tag AS t ON t.tag_id = c.tag_id JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id ORDER BY t.tag_name ASC";
                   $r = mysqli_query($dbc, $query);
 
                   echo '<select class="form-control" name="forum" tabindex="3" id="forum_signup">';

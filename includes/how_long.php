@@ -79,7 +79,7 @@
 				$str = ($n == 1) ? "1 year" : "$n years";
 				break;*/
 			default:
-				if($this_year == $year) {
+				if($this_year != $year) {
 					$str = "$open $year $close";
 				} else {
 					$str = "$open $close";
