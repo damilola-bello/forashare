@@ -65,6 +65,12 @@
 
         $answer_focus_id = null;
         $answer_focus_user_id = null;
+
+        $set_seen = false;
+        if(isset($_GET['source']) && $_GET['source'] == "notification") {
+          $set_seen = true;
+        }
+
         //check if the page should display a particular answer
         if (isset($_GET['answer']) && isset($_GET['uid'])) {
           $temp_answer = $_GET['answer'];
@@ -72,7 +78,17 @@
           if((filter_var($temp_answer, FILTER_VALIDATE_INT) === 0 || filter_var($temp_answer, FILTER_VALIDATE_INT)) && (filter_var($temp_user_id, FILTER_VALIDATE_INT) === 0 || filter_var($temp_user_id, FILTER_VALIDATE_INT))) {
             $answer_focus_id = intval($_GET['answer']);
             $answer_focus_user_id = intval($_GET['uid']);
+
+            if($loggedin) {
+              $stmt = $dbc->prepare("UPDATE notifications SET seen = '1' WHERE notified_id = ? AND question_id = ? AND answer_id = ? ");
+              $stmt->bind_param("iii", $_SESSION['user_id'], $question_id, $answer_focus_id);
+              $stmt->execute();
+            }
           }
+        } else if($loggedin) {
+          $stmt = $dbc->prepare("UPDATE notifications SET seen = '1' WHERE notified_id = ? AND question_id = ? ");
+          $stmt->bind_param("ii", $_SESSION['user_id'], $question_id);
+          $stmt->execute();
         }
     ?>
     <div class="question-outer-container">
@@ -997,7 +1013,6 @@
 
             $.post('make_answer.php', {body: body, id: questionID}, function(data, status) {
               if(status == "success") {
-                console.log(data);
                 var dataObj = JSON.parse(data);
                 var msg = dataObj.message;
                 
@@ -1103,7 +1118,6 @@
             }
             $.get('load_more_answers.php', payload, 
               function(data, status) {
-                console.log(data);
                 if(status == "success") {
                   if(data.isErr == false) {
                     //reset the answers if aparticular answer was previously shown
@@ -1124,9 +1138,6 @@
 
         }
         model = new AppViewModel();
-        /*model.answer.subscribe(function(newValue) {
-            console.log("The person's new name is " , newValue);
-        });*/
         ko.applyBindings(model, document.getElementById("main_content"));
 
         function displayFeedback(msg) {

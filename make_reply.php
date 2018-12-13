@@ -10,9 +10,10 @@
 		//array to hold the return data
 	  $return = array();
 	  if($loggedin == true) {
-		$view_user_id = $_SESSION['user_id'];
+	  	$answer_owner_id = -1;
+			$view_user_id = $_SESSION['user_id'];
 
-		$errors = array();
+			$errors = array();
 	  	$body = (empty($_POST['body']) ? null : trim($_POST['body']));
 	  	$body = str_replace("\r\n", "\n", $body);
 	  	$question_id = (empty($_POST['question_id']) ? null : trim($_POST['question_id']));
@@ -54,12 +55,12 @@
         $stmt->close();
 
         //check if reply exists
-        $stmt = $dbc->prepare("SELECT answer_id FROM answer WHERE parent_answer_id IS NULL AND question_id = ? AND answer_id = ? ");
+        $stmt = $dbc->prepare("SELECT answer_id, user_id FROM answer WHERE parent_answer_id IS NULL AND question_id = ? AND answer_id = ? ");
 	      $stmt->bind_param("ii", $question_id, $answer_id);
 	      $stmt->execute();
 	      $stmt->store_result();
 	      if($stmt->num_rows == 1) {
-          $stmt->bind_result($answer_id);
+          $stmt->bind_result($answer_id, $answer_owner_id);
           $stmt->fetch();
         } else {
         	//question does not exist
@@ -134,6 +135,16 @@
 					$stmt = $dbc->prepare("UPDATE answer SET replies = ? WHERE parent_answer_id IS NULL AND question_id = ? AND answer_id = ? ");
 		    	$stmt->bind_param("iii", $reply_count, $question_id, $answer_id);
 	    		$stmt->execute();
+
+	    		//set the notification only if the reply is from another user
+	    		if($answer_owner_id != $view_user_id) {
+			    	$notification_type = "reply";
+		    		$notification_text = "replied to your answer";
+
+		  			$stmt = $dbc->prepare("INSERT INTO notifications (notifier_id, notified_id, type, notification_time, question_id, answer_id, reply_id, text) VALUES (?, ?, ?, NOW(), ?, ?, ?, ?) ");
+			    	$stmt->bind_param("iisiiis", $view_user_id, $question_owner_id, $notification_type, $question_id, $answer_id, $last_id, $notification_text);
+		    		$stmt->execute();
+	    		}
     		}
 	    	//Close the statement
 				$stmt->close();
@@ -152,21 +163,21 @@
 
 	  		//get the user's profile picture/icon
 	  		$stmt = $dbc->prepare("SELECT username, profile_image FROM user WHERE user_id = ?");
-	        $stmt->bind_param("i", $view_user_id);
-	        $stmt->execute();
-	        $stmt->store_result();
-	        $stmt->bind_result($view_user_username, $view_user_profile_image);
-	        $stmt->fetch();
-	        $stmt->free_result();
-	        $stmt->close();
-	        unset($stmt);
+        $stmt->bind_param("i", $view_user_id);
+        $stmt->execute();
+        $stmt->store_result();
+        $stmt->bind_result($view_user_username, $view_user_profile_image);
+        $stmt->fetch();
+        $stmt->free_result();
+        $stmt->close();
+        unset($stmt);
 
-	        //if there are answers 
-	        if($reply_count > 0) {
-	        	require_once('replies.php');
-	        	$limit = 1;
-	        	$return = array("isErr" => false, "message" => show_replies($dbc, $question_id, $reply_count, $answer_id, $loggedin, $limit, $eligible_to_reply, $view_user_username, $view_user_profile_image, $view_user_id));
-	        }
+        //if there are answers 
+        if($reply_count > 0) {
+        	require_once('replies.php');
+        	$limit = 1;
+        	$return = array("isErr" => false, "message" => show_replies($dbc, $question_id, $reply_count, $answer_id, $loggedin, $limit, $eligible_to_reply, $view_user_username, $view_user_profile_image, $view_user_id));
+        }
 	  	}
 
 		} else {

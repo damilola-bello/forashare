@@ -17,9 +17,9 @@
   ?>
   
   <div class="main-content">
-    <div class="create-link-box row">
+    <!-- <div class="create-link-box row">
       <a href="#" class="create-link">Create Tag</a>
-    </div>
+    </div> -->
 
     <div class="page-header">
       <h1 class="page-title">New Question</h1>
@@ -71,21 +71,21 @@
 
           <div class="subcontent">
             <div class="info-subcontent-title">
-              <span class="info-subcontent-title-text">Topics</span>
+              <span class="info-subcontent-title-text">Tags</span>
             </div>
             <div class="info-subcontent">
-              <p><span class="optional">Required.</span><br>Again, this forum is issues-based and the predefined topics are the talking points we want our users to focus on. The topics are also useful when searching for questions so try to attach topic(s) that your question falls under.<br><span class="max">You must attach at least one topic to your question, with a maximum of three.</span></p>
+              <p><span class="optional">Required.</span><br>This forum is issues-based and the predefined tags are the talking points we want our users to focus on. They are also useful when searching for questions so try to attach tag(s) that your question falls under.<br><span class="max">You must attach at least one tag to your question, with a maximum of three.</span></p>
             </div>
           </div>
 
-          <div class="subcontent">
+          <!-- <div class="subcontent">
             <div class="info-subcontent-title">
               <span class="info-subcontent-title-text">Custom Tags</span>
             </div>
             <div class="info-subcontent">
               <p><span class="optional">Optional.</span> You can choose to post your question under a user-defined tags. This streamlines your question and makes it more specific. It is advisable to add at least a custom tag to your question.<br><span class="max">You can add a maximum of three custom tags to your question.</span></p>
             </div>
-          </div>
+          </div> -->
         </div>  
         </div>
         
@@ -162,7 +162,7 @@
           <div class="row_">
             <div class="dropdown checkbox-dropdown-box" id="ask_question_tags_dropdown">
               <a class="dropdown-toggle form-control" href="#" id="askQuestionTagLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                <span>topics</span>&nbsp;&nbsp;<i class="fas fa-tags"></i>
+                <span>tags</span>&nbsp;&nbsp;<i class="fas fa-tags"></i>
               </a>
 
               <ul class="dropdown-menu menu-filter dropdown-menu-left checkbox-dropdown ask-topic-check" aria-labelledby="askQuestionTagLink">
@@ -220,13 +220,13 @@
           </div>
         </div>
 
-        <div class="form-group">
+        <!-- <div class="form-group">
           <span class="form-lbl">Add Custom Tags</span>
           <div class="add-topic-box">
             <input type="text" placeholder="Find Custom Tag" class="form-control">
             <div></div>
           </div>
-        </div>
+        </div> -->
 
         <div class="form-group d-flex justify-content-end">
           <button class="btn submit-btn" onclick="askQuestionSubmit();">Post</button>

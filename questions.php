@@ -28,7 +28,7 @@
                 $query = "SELECT tag_id, tag_name FROM tag AS t JOIN tag_type AS tt ON t.tag_type_id = tt.tag_type_id WHERE tt.name = 'default_tag' ORDER BY t.tag_name ASC";
                 $r = mysqli_query($dbc, $query);
                 $tags = array(
-                  array('tag_name' => "Check/Uncheck All",
+                  array('tag_name' => "All",
                   'tag_id' => -1)
                 );
                 while ($row = mysqli_fetch_array($r, MYSQLI_ASSOC)) {

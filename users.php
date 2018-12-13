@@ -197,10 +197,8 @@
           var start = (reset) ? 0 : self.users().length;
 
           var payload = { start: start, ...self.sortParam(), ...self.countryIDParam(), ...self.searchParam() };
-          console.log(payload);
           $.get('get_users.php', payload, 
             function(data, status) {
-              console.log(data);
               if(status == "success") {
                 if(data.isErr == false) {
                   //update the observable array

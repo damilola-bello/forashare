@@ -45,6 +45,27 @@
       $search_country_ID = 0;
     }
   }
+
+  $pending_notification = false;
+  $original_page_title = $page_title;
+  if($loggedin) {
+    //check if there is a new notification
+    $stmt = $dbc->prepare("SELECT COUNT(notified_id)
+      FROM notifications
+      WHERE open = '0' AND notified_id = ?
+    ");
+    $stmt->bind_param("i", $_SESSION['user_id']);
+    $stmt->execute();
+    $stmt->store_result();
+    $stmt->bind_result($notification_count);
+    $stmt->fetch();
+    if($notification_count > 0) {
+      $pending_notification = true;
+      $page_title = "($notification_count) $page_title";
+    }
+    unset($notification_count);
+
+  }
 ?>
 <!DOCTYPE html>
 <html lang="en" <?php echo ($is_default_font == false) ? "style='font-size: $font"."px'" : ""; ?> >
@@ -90,7 +111,7 @@
         </div>
         <div id="top_bar" class="row">
            <div class="row" id="logo_search">
-            <a href="<?php echo pageDir() . '/'; ?>">
+            <a href="/">
               <span id="logo" class="row align-items-center"></span>
             </a>
             <div id="search_area" class="row align-items-center">
@@ -125,13 +146,13 @@
                         </a>
                       </span>
                       <span data-bind="if: (searchCountry() != '')">
-                        <span class="results-from-box">
-                          <span class="results-from-text">
+                        <span data-bind="attr: { class: 'results-from-box' }">
+                          <span data-bind="attr: { class: 'results-from-text' }">
                             <span data-bind="text: 'Result(s) from '"></span>
                             <a data-bind="text: `${searchCountry()}`, attr: { href: `country.php?id=${searchCountryID()}` }"></a>
                           </span>
                           <span>
-                            <a data-bind="event: { click: showAllCountries }" class="show-all-link" href="#">Show All</a>
+                            <a data-bind="event: { click: showAllCountries }, attr: { class: 'show-all-link', href: '#' }, text: 'Show All'"></a>
                           </span>
                         </span>
                       </span>
@@ -169,7 +190,7 @@
                   }
                   
                 ?>
-                <select data-bind="options: countries, optionsText: function(item){ return `${item.tag_name != 'All' ? item.alpha_code + ' - ' : '' }` + item.tag_name}, optionsValue: 'tag_id', value: search_country_ID, event: {change: changeSearchCountryName, click: setClickValue }, attr: { class: 'form-control search-forum-list'}"></select>
+                <select data-bind="options: countries, optionsText: function(item){ return `${item.tag_name != 'All' ? item.alpha_code + ' - ' : '' }` + item.tag_name}, optionsValue: 'tag_id', value: search_country_ID, event: {change: changeSearchCountryName, click: setClickValue }" class="form-control search-forum-list"></select>
                 <?php echo "$search_flag"; ?>
               </div>
             </div>
@@ -238,8 +259,40 @@
             <!-- CONTROLS FOR LOGGED IN USER -->
             <div class="row" id="banner_ctrls">
               <ul id="notification_ctrls" class="row">
-                <li id="notification" class="banner-icon" data-toggle="tooltip" data-placement="bottom" title="Notifications">
-                  <i class="fas fa-bell ico"></i>
+                <li id="notification_icon" class="banner-icon dropdown">
+                  <div data-toggle="dropdown" id="notificationDropDown" aria-haspopup="true" aria-expanded="false" data-bind="css: { pending: (pending_notification() == true) }, attr: { title: ((pending_notification() == true ? 'Pending ' : '') + 'Notification(s)')}">
+                    <i class="fas fa-bell ico"></i>
+                    <span data-bind="if: pending_notification() == true">
+                      <span data-bind="attr: { class: 'notification-alert-icon' }"></span>
+                    </span>
+                  </div>
+                  <div class="dropdown-menu dropdown-menu-right" aria-labelledby="notificationDropDown" id="notificationDropDownBox">
+                    <div class="notification-mini-box">
+                      <span data-bind="if: notificationsLoading() == true">
+                        <span data-bind="html: HTMLSpinner, attr: { class: 'notification-loading-box' }"></span>
+                      </span>
+                      <ul data-bind=" foreach: notifications">
+                        <li data-bind=" attr: { class: 'notification-list-item' }">
+                          <a data-bind=" attr: { href: `${notification_link}` }, css: { 'not-seen': (seen == false)}" class="notification-list-item-link">
+                            <span data-bind=" attr: { class: 'notifcation-text' }">
+                              <span data-bind=" attr: { class: 'name' }, text: notifier_username"></span>
+                              <span data-bind=" text: notification_text"></span>
+                            </span>
+                            <span data-bind=" attr: { class: 'notification-details' }">
+                              <i data-bind=" css: $parent.notificationIconClass(notification_type)" class="notification-type-icon"></i>
+                              <span data-bind="attr: { class: 'notification-time' }, text: how_long"></span>
+                            </span>
+                          </a>
+                        </li>
+                      </ul>
+                      <span data-bind="if: (noNotifications() == true && notificationsFetched() == true)">
+                        <span data-bind=" attr: {class: 'no-notification-text'}">No Notification</span>
+                      </span>
+                      <span data-bind="if: (notificationsFetched() == true && noNotifications() == false)">
+                        <a href="notifications.php" class="notification-see-all">See All</a>
+                      </span>
+                    </div>
+                  </div>
                 </li>
                 <li id="profile" class="banner-icon">
                   <a href="user.php?id=<?php echo $_SESSION['user_id']; ?>" class="banner-profile-pic-link" title="Go to your Profile Page">
@@ -271,10 +324,10 @@
                 <div class="banner-icon dropdown-toggle" id="options" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                 </div>
                 <ul class="dropdown-menu dropdown-menu-right" id="more_options_menu" aria-labelledby="options">
-                  <li class="dropdown-item">
+                  <!-- <li class="dropdown-item">
                     <a href="#" class="more-options-link">Create Topic</a>
                   </li>
-                  <li class="dropdown-divider"></li>
+                  <li class="dropdown-divider"></li> -->
                   <li class="dropdown-item">
                     <a href="user.php?id=<?php echo $_SESSION['user_id']; ?>" class="more-options-link">Profile</a>
                   </li>
@@ -282,11 +335,16 @@
                     <a href="saved.php" class="more-options-link">Saved Questions</a>
                   </li>
                   <li class="dropdown-divider"></li>
-                  <li class="dropdown-item">
+                  <!-- <li class="dropdown-item">
                     <a href="#" class="more-options-link">Activity Log</a>
-                  </li>
-                  <li class="dropdown-item">
-                    <a href="#" class="more-options-link">Notifications</a>
+                  </li> -->
+                  <li class="dropdown-item rel">
+                    <a href="notifications.php" class="more-options-link">
+                      <span>Notifications</span>
+                      <span data-bind="if: pending_notification() == true">
+                        <span data-bind="attr: { class: 'notification-alert-icon' }"></span>
+                      </span>
+                    </a>
                   </li>
                   <li class="dropdown-divider"></li>
                   <li class="dropdown-item">
@@ -325,9 +383,11 @@
           <?php
             $a = array(
               'search_country_ID' => $search_country_ID,
-              'countries' => $page_search_countries
+              'countries' => $page_search_countries,
+              'pending_notification' => $pending_notification,
+              'original_page_title' => $original_page_title
             );
-            echo "var json_search_countries_payload = " . json_encode($a) . ";";
+            echo "var json_topbar_payload = " . json_encode($a) . ";";
             unset($a);
           ?>
 
@@ -344,14 +404,14 @@
             self.image = data.image;
           }
 
-          function SearchModel() {
+          function TopBarModel() {
             var self = this;
 
             self.HTMLSpinner ="<i class='fas fa-spinner loading-icon'></i>";
             self.searchTextTimeOut = ko.observable(0);
             self.searchDDLTimeOut = ko.observable(0);
-            self.countries = json_search_countries_payload.countries;
-            self.search_country_ID = json_search_countries_payload.search_country_ID;
+            self.countries = json_topbar_payload.countries;
+            self.search_country_ID = json_topbar_payload.search_country_ID;
             self.selectedCountryID = ko.observable(self.search_country_ID);
             self.pageSearchQuery = ko.observable('');
             self.loaded = ko.observable(false);
@@ -383,6 +443,62 @@
               clickEl = 'search_select_country';
             }
 
+            <?php
+              if($loggedin) {
+            ?>
+            self.pending_notification = ko.observable(json_topbar_payload.pending_notification);
+            self.notificationsFetched = ko.observable(false);
+            self.notificationsLoading = ko.observable(false);
+            self.noNotifications = ko.observable(true);
+            self.pageTitle = json_topbar_payload.original_page_title;
+            self.notifications = ko.observableArray([]);
+            self.notificationIconClass = function(type) {
+              let str = "";
+              if(type == "like") {
+                str = "far fa-thumbs-up like";
+              } else if(type == "dislike") {
+                str = "far fa-thumbs-down dislike";
+              } else if(type == "answer") {
+                str = "fas fa-comments answer";
+              }
+              return str;
+            };
+            self.fetchNotifications = function(){
+              //fetch the top 5 notifications
+              if(self.notificationsFetched() == true) {
+                return;
+              }
+              self.notificationsLoading(true);
+              let payload = { mini: 1 };
+              $.get('fetch_notifications.php', payload, 
+                function(data, status) {
+                  if(status == "success") {
+                    if(data.isErr == false) {
+                      self.notificationsFetched(true);
+                      self.notificationsLoading(false);
+                      let notificationsJSON = data.message.notifications;
+                      if(notificationsJSON.length == 0) {
+                        self.noNotifications(true);
+                      } else if(notificationsJSON.length > 0) {
+                        self.noNotifications(false);
+                        self.notifications(notificationsJSON);
+                      }
+                      self.pending_notification(data.message.pending_notification);
+                      //reset the page title if there are no pending notifications
+                      if(self.pending_notification() == false) {
+                        document.title = self.pageTitle.replace("&ndash;", "\u2013");
+                      }
+                    } else {
+                      self.notificationsLoading(false);
+                    }
+                  } 
+                }, "json"
+              );
+            };
+            $('#notification_icon').on('show.bs.dropdown', self.fetchNotifications);
+            <?php
+              }
+            ?>
             self.changeSearchCountryName = function(koObj, e) {
               clearTimeout(self.searchDDLTimeOut());
               let selectedID = Number(e.currentTarget.value);
@@ -443,11 +559,11 @@
                     }
                   } 
               }, "json");
-            }
+            };
           }
 
-          var searchModel = new SearchModel();
-          ko.applyBindings(searchModel, document.getElementById("top_bar"));
+          var TopBarModel = new TopBarModel();
+          ko.applyBindings(TopBarModel, document.getElementById("top_bar"));
         </script>
         <span class="fontsize-change-box">
           <i class="far fa-minus-square change-font font-subtract <?php if($font == 13) echo 'disabled'; ?>" title="Decrease Font" data-font="subtract"></i>

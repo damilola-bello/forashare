@@ -109,13 +109,26 @@
 	    		$stmt->store_result();
 	    		$stmt->bind_result($answer_count);
 	    		$stmt->fetch();
-	    		$stmt->free_result();
 
 					//update the answer count in the question
 					$stmt = $dbc->prepare("UPDATE question SET answers = ? WHERE question_id = $question_id");
 		    	$stmt->bind_param("d", $answer_count);
 	    		$stmt->execute();
+
+	    		//set the notification only if the answer is from another user
+	    		if($question_owner_id != $view_user_id) {
+			    	$notification_type = "answer";
+		    		$notification_text = "answered your question";
+
+		  			$stmt = $dbc->prepare("INSERT INTO notifications (notifier_id, notified_id, type, notification_time, question_id, answer_id, text) VALUES (?, ?, ?, NOW(), ?, ?, ?) ");
+			    	$stmt->bind_param("iisiis", $view_user_id, $question_owner_id, $notification_type, $question_id, $last_id, $notification_text);
+		    		$stmt->execute();
+	    		}
 	  		}
+	    	
+
+
+	    	$stmt->free_result();
 	    	//Close the statement
 				$stmt->close();
 				unset($stmt);

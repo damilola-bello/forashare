@@ -150,6 +150,38 @@
     		$stmt->bind_param("ii", $score_addition, $answer_user_id);
 		    $stmt->execute();
 
+		    $notification_type = "answer_like";
+    		$notification_text = (($is_like == 0) ? "disliked" : "liked") . " your answer";
+    		//set the notification
+    		$stmt = $dbc->prepare("SELECT is_like, notification_id
+    			FROM notifications 
+    			WHERE notifier_id = ? AND notified_id = ? AND type = ? AND question_id = ? AND answer_id = ? AND seen = '0' ");
+	    	$stmt->bind_param("iisii", $view_user_id, $question_owner_id, $notification_type, $question_id, $answer_id);
+    		$stmt->execute();
+    		$stmt->store_result();
+    		if($stmt->num_rows === 1) {
+    			//if a notification instance exists and hasn't been opened, update the instance
+    			$stmt->bind_result($previous_like, $notification_id);
+	    		$stmt->fetch();
+
+	    		//remove the notification
+	    		if(intval($previous_like) == intval($is_like)) {
+	    			$stmt = $dbc->prepare("DELETE FROM notifications WHERE notification_id = ?");
+			    	$stmt->bind_param("i", $notification_id);
+		    		$stmt->execute();
+	    		} else {
+		    		$stmt = $dbc->prepare("UPDATE notifications SET notification_time = NOW(), is_like = ?, text = ? WHERE notification_id = ?");
+		    		$stmt->bind_param("ssi", $is_like, $notification_text, $notification_id);
+				    $stmt->execute();
+	    		}
+
+    		} else {
+    			//if the notification instance does not exist, create a new one
+    			$stmt = $dbc->prepare("INSERT INTO notifications (notifier_id, notified_id, type, notification_time, question_id, answer_id, is_like, text) VALUES (?, ?, ?, NOW(), ?, ?, ?, ?) ");
+		    	$stmt->bind_param("iisiiss", $view_user_id, $question_owner_id, $notification_type, $question_id, $answer_id, $is_like, $notification_text);
+	    		$stmt->execute();
+    		}
+
     		$stmt->free_result();
 	    	//Close the statement
 				$stmt->close();

@@ -104,11 +104,11 @@
         }
 
         //get the user's info
-        $stmt = $dbc->prepare("SELECT u.username, u.profile_score, u.info, YEAR(u.date_joined), MONTHNAME(u.date_joined), DAY(u.date_joined), u.profile_image, t.tag_name, t.tag_id FROM user AS u JOIN tag AS t ON u.tag_id = t.tag_id WHERE user_id = ?");
+        $stmt = $dbc->prepare("SELECT u.username, u.profile_score, u.info, u.followers, u.following, YEAR(u.date_joined), MONTHNAME(u.date_joined), DAY(u.date_joined), u.profile_image, t.tag_name, t.tag_id FROM user AS u JOIN tag AS t ON u.tag_id = t.tag_id WHERE user_id = ?");
         $stmt->bind_param("d", $user_id);
         $stmt->execute();
         $stmt->store_result();
-        $stmt->bind_result($username, $profile_score, $info, $year_joined, $month_joined, $day_joined, $profile_image, $user_country_name, $user_country_id);
+        $stmt->bind_result($username, $profile_score, $info, $followers_count, $following_count, $year_joined, $month_joined, $day_joined, $profile_image, $user_country_name, $user_country_id);
         $stmt->fetch();
         $stmt->free_result();
         $stmt->close();
@@ -144,22 +144,6 @@
 
         $profile_score_positive = ($profile_score > 0) ? true : false;
 
-        //get the number of followers
-        $stmt = $dbc->prepare("SELECT COUNT(following_id) FROM user_following WHERE following_id = ? ");
-        $stmt->bind_param("i", $user_id);
-        $stmt->execute();
-        $stmt->store_result();
-        $stmt->bind_result($followers_count);
-        $stmt->fetch();
-
-        //get the number of following
-        $stmt = $dbc->prepare("SELECT COUNT(follower_id) FROM user_following WHERE follower_id = ? ");
-        $stmt->bind_param("i", $user_id);
-        $stmt->execute();
-        $stmt->store_result();
-        $stmt->bind_result($following_count);
-        $stmt->fetch();
-
         $stmt->free_result();
         $stmt->close();
 
@@ -169,7 +153,7 @@
         if($is_owner) {
       ?>
       <p class="edit-profile-mode-box">
-        <span class="mode-text">Edit Mode</span>
+        <span class="mode-text">Edit Profile</span>
         <label class="switch">
           <input type="checkbox" data-bind="event: { change: toggleEditMode }">
           <span class="slider"></span>
@@ -1291,7 +1275,6 @@
           $.get('get_followers.php', payload, 
             function(data, status) {
               if(status == "success") {
-                console.log(data);
                 if(data.isErr == false) {
                   //flag to indicate the followers have been fetched
                   self.followersFetched(true);

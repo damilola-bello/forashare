@@ -48,6 +48,24 @@
   $page_title = $page_heading . " &ndash; ForaShare";
   $page = TAG;
   require('includes/header.php');
+
+  $is_following = false;
+  if($loggedin) {
+    $view_user_id = intval($_SESSION['user_id']);
+    //check if user is following tag
+    $stmt = $dbc->prepare("SELECT COUNT(tag_id) 
+      FROM tag_following AS tf
+      WHERE tf.tag_id = ? AND tf.user_id = ? ");
+    $stmt->bind_param("ii", $page_tag_id, $view_user_id);
+    $stmt->execute();
+    $stmt->store_result();
+    $stmt->bind_result($temp_count);
+    $stmt->fetch();
+
+    if($temp_count == 1) {
+      $is_following = true;
+    }
+  }
 ?>
 <!-- CONTAINER -->
 <div class="container-fluid content-container" id="main_content">
@@ -86,6 +104,21 @@
         ?>
         <select class="form-control filter-forum-list" data-bind="options: countries, optionsText: 'tag_name', optionsValue: 'tag_id', event: {change: changeCountryName}">
         </select>
+      </div>
+    </div>
+    <div data-bind="if: loggedin == true">
+      <div data-bind=" attr: { class: 'tag-follow-box' }">
+        <span data-bind="if: is_following() == true">
+          <button data-bind="attr: {class: 'btn unfollow-button', title: 'Stop following'}, event: {click: followUser.bind($data, '0')}">
+            <span data-bind="html: checkIconHTML"></span>
+            <span data-bind="text: (followLoading() == true ? '...Loading' : 'Following'), css: {italic: followLoading() == true }"></span>
+          </button>
+        </span>
+        <span data-bind="if: is_following() == false">
+          <button data-bind="attr: {class: 'btn follow-button'}, event: {click: followUser.bind($data, '1')}">
+            <span data-bind="text: (followLoading() == true ? '...Loading' : 'Follow Tag'), css: {italic: followLoading() == true }"></span>
+          </button>
+        </span>
       </div>
     </div>
     <div id="tag_filter_header" class="filter-header">
@@ -175,7 +208,10 @@
         $a = array(
           'tag_id' => $page_tag_id,
           'tag_name' => $tag_name,
-          'countries' => $countries
+          'countries' => $countries,
+          'loggedin' => $loggedin,
+          'tag_id' => $page_tag_id,
+          'is_following' => $is_following
         );
         echo "var json_payload = " . json_encode($a) . ";";
       ?>
@@ -209,6 +245,34 @@
       function AppViewModel() {
         var self = this;
 
+        self.loggedin = json_payload.loggedin;
+        self.is_following = ko.observable(json_payload.is_following);
+        self.followLoading = ko.observable(false);
+        self.checkIconHTML = '<i class="fas fa-check"></i>';
+        self.tag_id = json_payload.tag_id;
+        self.followUser = function(param) {
+          //validate follow parameter
+          let pattern = /^[0|1]$/;
+          if(pattern.test(param)) {
+            self.followLoading(true);
+            let payload = {follow: param, tag_id: self.tag_id};
+            $.get('follow_tag.php', payload, 
+            function(data, status) {
+              if(status == "success") {
+                if(data.isErr == false) {
+                  self.is_following(data.message.is_following);
+                  if(self.is_following() == true) {
+                    displayFeedback('Following');
+                  }
+                  self.followLoading(false);
+                }
+              } else {
+                self.followLoading(false);
+              }
+            }, "json"
+          );
+          }
+        };
         self.tagName = json_payload.tag_name;
         self.tagID = json_payload.tag_id;
         let mappedCountries = json_payload.countries.map(country => new CountryModel(country));
@@ -329,6 +393,18 @@
 
       var model = new AppViewModel();
       ko.applyBindings(model, document.getElementById("main_content"));
+
+      function displayFeedback(msg) {
+        //display feedback and remove any feedback span present
+        $('.questionive-feedback').remove();
+        var $feedback = $('body').append('<span class="positive-feedback"></span>');
+        $('.positive-feedback').text(msg);
+        setTimeout(function(){
+          $('.positive-feedback').fadeOut(function(){
+            $('.positive-feedback').remove();
+          });
+        }, 2000);
+      }
     </script>
     <?php
       endif;

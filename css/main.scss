@@ -468,9 +468,11 @@ ul {
   align-items: center;
   justify-content: center;
   min-width: 40px;
-  cursor: pointer;
   font-size: 1.28em;
   height: 100%;
+  &:not(#notification_icon) { 
+    cursor: pointer;
+  }
   .ico {
     color: #a0a0a0;
     padding: 1px;
@@ -478,10 +480,10 @@ ul {
   &::after {
     color: #a0a0a0;
   }
-  &#notification:hover, &#follow_activity:hover, &#notification:hover, &#searchbar_trigger:hover {
+  &#searchbar_trigger:hover {
     background-color: $ico_dim;
   }
-  &:hover {
+  &:hover:not(#notification_icon) {
     transition: 0.3s;
     .ico {
       color: #000;
@@ -491,6 +493,111 @@ ul {
     margin-left: 20px;
   }
 }
+#notification_icon {  
+  #notificationDropDown {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    flex-flow: row;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    &:hover, &.pending {
+      transition: 0.3s;
+      background-color: #ececec;
+      background-image: linear-gradient(#e5e5e5, #eee);
+      .ico {
+        color: #000;
+      }
+    }
+  }
+  &.show {
+    #notificationDropDown {
+      background-color: $ico_dim;
+      .ico {
+        color: #000;
+      }
+    }
+  }
+}
+.notification-filter {
+  justify-content: flex-end;
+}
+.notification-alert-icon {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  display: block;
+  top: 5px;
+  right: 5px;
+  background: #f00;
+  border-radius: 50%;
+}
+#notificationDropDownBox {
+  min-width: 250px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+  border: 1px solid #aaa;
+  border-radius: 0.15rem;
+  margin: 0;
+}
+.notification-list-item {
+  &:not(:last-of-type) {
+    border-bottom: 1px solid #ccc;
+  }
+  .notification-list-item-link {
+    display: flex;
+    flex-flow: column;
+    padding: 0.15rem 0.85rem;
+    color: #111;
+    .name {
+      font-weight: 700;
+    }
+    &:hover {
+      background-color: #f8f8f8;
+    }
+    &.not-seen {
+      background-color: #f2f4fc;
+      &:hover {
+        background-color: #e1e3ed;
+      }
+    }
+  }
+}
+.notification-see-all {
+  display: block;
+  text-align: center;
+  padding: 7px 2px;
+  border-top: 1px solid #ccc;
+  font-weight: 600;
+  color: #03124f;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+.notification-text {
+  
+}
+.notification-details {
+  font-size: 0.85rem;
+  margin-top: 5px;
+}
+.notification-time {
+  color: #777;
+  margin-left: 5px;
+}
+.notification-type-icon {
+  font-weight: 600;
+  &.like {
+    color: #1200ff;
+  }
+  &.dislike {
+    color: #555;
+  }
+  &.answer {
+    color: #ff6c00;
+  }
+}
 .banner-icon-active {
   &:not(#options) {
     background-color: $dim; 
@@ -498,6 +605,11 @@ ul {
   .ico {
     color: #000;
   }
+}
+.no-notification-text {
+  display: block;
+  text-align: center;
+  padding: 5px;
 }
 .banner-profile-pic-link {
   width: 100%;
@@ -514,7 +626,7 @@ ul {
     }
   }
 }
-#banner_signin::after {
+#banner_signin::after, #notification_icon::after {
   width: 0;
   height: 0;
   content: '';
@@ -527,7 +639,7 @@ ul {
   right: 40%;
   display: none;
 }
-#banner_signin.show {
+#banner_signin.show, #notification_icon.show {
   &::after {
     display: block;   
   }
@@ -722,7 +834,7 @@ ul {
   display: flex;
   flex-flow: column;
 }
-.countries-outer-container, .questions-outer-container, .users-outer-container { 
+.countries-outer-container, .questions-outer-container, .users-outer-container, .notifications-outer-container { 
   display: flex; 
   flex-flow: column;
   flex-grow: 1; }
@@ -2021,6 +2133,9 @@ ul {
     &:active {
       color: green;
     }
+    &.rel {
+      position: relative;
+    }
     cursor: pointer;
   }
   &.menu-filter {
@@ -2090,7 +2205,7 @@ ul {
     color: #000;
   }
 }
-.search-loading-box {
+.search-loading-box, .notification-loading-box {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -2230,6 +2345,12 @@ ul {
 }
 .filter-page-title {
   margin: 0.9rem 0px;
+  .page-title-info {
+    display: block;
+    font-size: 0.8rem;
+    color: #555;
+    margin-top: 5px;
+  }
 }
 .filter-header {
   border-bottom: 1px solid #ccc;
@@ -2312,7 +2433,17 @@ ul {
     margin-right: 8px;
   }
 }
-
+.asked-by {
+  font-style: italic;
+  font-size: 0.85rem;
+  .asked-by-link:hover {
+    text-decoration: underline;
+  }
+}
+.home-feed-info-box {
+  font-size: 1.15rem;
+  margin: 17px 0px;
+}
 .lists-box {
   font-size: 0.9rem;
 }
@@ -2658,6 +2789,11 @@ ul {
     font-weight: 600;
   }
 }
+.tag-follow-box {
+  margin: 6px 0px;
+  display: flex;
+  justify-content: flex-end;
+}
 .answer-icon {
   color: #555;
   font-size: 1.25rem;
@@ -2785,7 +2921,7 @@ ul {
   height: 35px;
   border-radius: 50%;
 }
-.countries-box, .questions-box, .users-box, .tag-content-box  {
+.countries-box, .questions-box, .users-box, .tag-content-box, .notifications-box  {
   position: relative;
   flex-grow: 1;
 }
